@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>HideoutSiege.Server</AssemblyName>
+    <RootNamespace>HideoutSiege.Server</RootNamespace>
+    <Authors>JRS</Authors>
+    <Company>JRS</Company>
+    <Copyright>Copyright © 2026 JRS</Copyright>
+    <Version>0.1.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <SPTPath Condition="'$(SPTPath)' == ''">F:\SPT</SPTPath>
+    <Runtime>$(SPTPath)\SPT_Runtime</Runtime>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\shared\SiegeIds.cs" Link="SiegeIds.cs" />
+    <Reference Include="0Harmony" HintPath="$(Runtime)/0Harmony.dll" Private="false" />
+    <Reference Include="SPTarkov.DI" HintPath="$(Runtime)\SPTarkov.DI.dll" Private="false" />
+    <Reference Include="SPTarkov.Server.Core" HintPath="$(Runtime)\SPTarkov.Server.Core.dll" Private="false" />
+    <Reference Include="SPTarkov.Common" HintPath="$(Runtime)\SPTarkov.Common.dll" Private="false" />
+    <Reference Include="SPTarkov.Reflection" HintPath="$(Runtime)\SPTarkov.Reflection.dll" Private="false" />
+    <Reference Include="SemanticVersioning" HintPath="$(Runtime)\SemanticVersioning.dll" Private="false" />
+  </ItemGroup>
+</Project>

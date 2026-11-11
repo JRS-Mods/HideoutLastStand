@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>HideoutSiege.Brains</AssemblyName>
+    <RootNamespace>HideoutSiege.Brains</RootNamespace>
+    <Authors>JRS</Authors>
+    <Company>JRS</Company>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.0</Version>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DebugType>none</DebugType>
+    <SPTPath Condition="'$(SPTPath)' == ''">F:\SPT</SPTPath>
+    <Managed>$(SPTPath)\EscapeFromTarkov_Data\Managed</Managed>
+    <BigBrain Condition="Exists('$(SPTPath)\BepInEx\plugins\DrakiaXYZ-BigBrain.dll')">$(SPTPath)\BepInEx\plugins\DrakiaXYZ-BigBrain.dll</BigBrain>
+    <BigBrain Condition="'$(BigBrain)' == ''">$(SPTPath)\_mods_disabled\BepInEx\plugins\DrakiaXYZ-BigBrain.dll</BigBrain>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="HideoutSiege" HintPath="..\client\bin\Release\HideoutSiege.dll" Private="false" />
+    <Reference Include="DrakiaXYZ-BigBrain" HintPath="$(BigBrain)" Private="false" />
+    <Reference Include="Assembly-CSharp" HintPath="$(Managed)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="Comfort" HintPath="$(Managed)\Comfort.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(Managed)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(Managed)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="ItemComponent.Types" HintPath="$(Managed)\ItemComponent.Types.dll" Private="false" />
+  </ItemGroup>
+</Project>
