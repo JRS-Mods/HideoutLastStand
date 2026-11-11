@@ -4,6 +4,21 @@ Your hideout gets attacked. An alert appears on the menus, you click **Start the
 
 For SPT 4.1. Works alone or with Fika.
 
+## What you need
+
+| Mod | Needed? | What it does here |
+|---|---|---|
+| **SPT** 4.1 | **Required** | |
+| **[Hideout Interiors](https://github.com/JRS-Mods/HideoutInteriors)** 0.2.0+ | **Required** | Its decor panel's **Defences** tab is where you place sandbags, steel barricades, barbed wire and the mounted gun. Your moved, hidden and decorated things are in the siege as you left them. Without it, this mod doesn't load. |
+| **Fika** | Optional | Co-op: the host runs the siege and everyone defends the host's hideout. Everyone needs the same version of this mod. |
+| **[Hideout Extensions](https://github.com/JRS-Mods/HideoutExtensions)** 1.3+ | Optional | Your built rooms are in the siege, and attackers can tunnel into one of them as a second way in. |
+| **SAIN** 4.5 (with BigBrain) | Optional | Smarter attackers. The siege steers them towards you when SAIN would have them sit in cover. |
+| **Black Division** | Optional | The attackers from wave 3 on. Without it, Raiders and Rogues come instead. |
+| ↳ MoreBots (with its patcher), WTT CommonLib, WTT ContentBackport, SAIN | Needed by Black Division | Black Division won't load without all of these, and you get Raiders and Rogues. |
+| WTT Armory | Works alongside | Tested with it installed. Black Division has loadouts that use it. |
+| ORBIT | Works alongside | Its bot brain stays out of the siege. Your other raids aren't affected. |
+| Bot Placement System, Waypoints | Works alongside | Tested with them installed. Nothing to set up. |
+
 ## How a siege goes
 
 1. **The alert.** When your hideout is invaded, a banner appears on the menus. Click **Start the Defense**, or **Later** to hide it until your next raid. When you're not under attack, the main menu shows a countdown to the next one. In co-op, the host starts it and the others join through Fika's server browser as usual.
@@ -25,7 +40,7 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 **Your hideout fights back.**
 - **Spare magazines:** with no room for a magazine on a rack, you're offered a swap for your emptiest one, which drops on the floor.
 - **Medstation and Nutrition Unit:** use each one once per break. Medstation levels 1 to 3 heal 40%, 70% or everything, and the Nutrition Unit restores 30, 60 or 100 energy and hydration.
-- **Defences:** with Hideout Interiors, its decor panel has a **Defences** tab. Put them where you like in your hideout and they're there in the siege. A hideout can only have so many of each (the panel shows how many you've got in), so you can't wall the place up solid. Nobody gets over sandbags or a steel barricade, you or the attackers. Attackers go round them where they can; where a wall of them shuts them out, they gather in front of it (fighting you over it if they can see you) and one of them walks up to the piece in the way, sets a charge on it and blows it, as they do a shut door ("THEY'RE BREACHING YOUR DEFENCES" once he's kneeling at it, the red lamp and a 5 second fuse; kill him before the charge is on and there's no breach), and the way's open for everyone after. Anything solid you put in a doorway, or out by the front door or on the stairs, sits the siege out.
+- **Defences:** Hideout Interiors' decor panel has a **Defences** tab. Put them where you like in your hideout and they're there in the siege. A hideout can only have so many of each (the panel shows how many you've got in), so you can't wall the place up solid. Nobody gets over sandbags or a steel barricade, you or the attackers. Attackers go round them where they can; where a wall of them shuts them out, they gather in front of it (fighting you over it if they can see you) and one of them walks up to the piece in the way, sets a charge on it and blows it, as they do a shut door ("THEY'RE BREACHING YOUR DEFENCES" once he's kneeling at it, the red lamp and a 5 second fuse; kill him before the charge is on and there's no breach), and the way's open for everyone after. Anything solid you put in a doorway, or out by the front door or on the stairs, sits the siege out.
 
   | | Most | In the siege |
   |---|---|---|
@@ -33,7 +48,7 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
   | Steel barricade | 3 | Taller than you, with a firing slit at eye height: nothing gets through the plate, but you can see and shoot through the slit (and so can they). Stand between its props, right up against it. Attackers go round it. |
   | Barbed wire | 4 | Stops nothing, but anyone in it can't run, slows to a crawl and gets their legs cut as they push through. Attackers don't go round it, so put it where you want them held up in your sights. It catches you too. |
   | Mounted gun | 1 | See below. |
-- **Mounted gun:** at Security level 2 or higher, a heavy machine gun, if you've put one in: Mounted gun is in Hideout Interiors' decor panel, Defences tab, and the one you place is where it stands, facing the way you turned it. Without one placed (or without Hideout Interiors), there's no gun. While nobody's on it and the power's on, it minds the door by itself: it slowly swings to the nearest attacker it can see within 24 metres, takes a second to settle, and fires short, loose bursts: 30 rounds a wave, topped up every break, and never with one of you in the way. It holds them up rather than clearing the room; someone on it does far better. Walk up and use **Operate** to take it over.
+- **Mounted gun:** at Security level 2 or higher, a heavy machine gun, if you've put one in: Mounted gun is in Hideout Interiors' decor panel, Defences tab, and the one you place is where it stands, facing the way you turned it. Without one placed, there's no gun. While nobody's on it and the power's on, it minds the door by itself: it slowly swings to the nearest attacker it can see within 24 metres, takes a second to settle, and fires short, loose bursts: 30 rounds a wave, topped up every break, and never with one of you in the way. It holds them up rather than clearing the room; someone on it does far better. Walk up and use **Operate** to take it over.
 - **Second way in:** from wave 2, about half of each wave comes another way. With Hideout Extensions' rooms built, they've dug a tunnel up to the wall of one of them, a room picked at random each invasion (one well away from the front door, where there's a choice): as that wave starts, the wall's blown and they come through it. The hole's ragged and scorched, and through it there's a dug tunnel with a bank of earth across it; they wait round the far side of the bank, out of your sight. You can't go into the tunnel, or past the cultist room's gate where the rest wait: walking in stops you where you were. The tunnel is never dug right alongside another room. Otherwise, if your Emergency Wall has its door, they blow that from the side you aren't on. Either way there's a warning and a short fuse, and there's never more than the one: the front door and this.
 
 **Watch the red lamp.** A charge's lamp blinks and beeps faster as it counts down, and stays on just before it goes off.
@@ -97,12 +112,14 @@ Every siege goes the same way: scavs for the first two waves, then Black Divisio
 
 ## Other mods
 
+What you need is in the table at the top ([What you need](#what-you-need)). In more detail:
+
 - **SAIN:** attackers run on SAIN if it's installed. SAIN's bots hold cover while they can't see you, so the siege takes over an attacker that hasn't seen any of you for a few seconds and walks it toward the nearest of you, blowing doors on the way; once one of you is in sight, SAIN fights. This uses BigBrain, which SAIN needs anyway.
 - **Bot mods with gear of their own:** a type whose bots come without weapons (its gear comes from a mod that isn't installed) is noticed on the loading screen, and others are sent in its place.
 - **ORBIT:** ORBIT's bot brain stays out of the siege, because the hideout has none of the zones it plans routes across. Your other raids aren't affected.
 - **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter.
 - **Hideout Extensions:** the rooms you've built are in the siege, with their doors and lamps, and your areas stand where you moved them. Attackers can follow you into the rooms, and you wake up wherever your Rest Space is. Needs Hideout Extensions 1.3 or later.
-- **Hideout Interiors:** the things you've moved, given to other areas or hidden are as you left them, and your decorations are there too, and so are your Defences. Needs Hideout Interiors 0.2 or later.
+- **Hideout Interiors:** the things you've moved, given to other areas or hidden are as you left them, and your decorations are there too, and so are your Defences. Required: 0.2.0 or later.
 
 In co-op, everyone gets the host's rooms, layout and decorations, as long as they have the same mods installed.
 

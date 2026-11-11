@@ -11,7 +11,8 @@ namespace HideoutSiege
     [BepInPlugin(Id, "Tushonka: Hideout Last Stand", Version)]
     [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
     [BepInDependency("xyz.drakia.bigbrain", BepInDependency.DependencyFlags.SoftDependency)]
-    [BepInDependency("jrs.hideoutinteriors", BepInDependency.DependencyFlags.SoftDependency)]
+    // Required: the Defences (sandbags, steel, barbed wire, mounted gun) are placed with it. Without it, BepInEx won't load this.
+    [BepInDependency("jrs.hideoutinteriors", "0.2.0")]
     [BepInDependency("jrs.hideoutextensions", BepInDependency.DependencyFlags.SoftDependency)]
     public sealed class Plugin : BaseUnityPlugin
     {
