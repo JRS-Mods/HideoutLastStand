@@ -11,7 +11,7 @@ For SPT 4.1. Works alone or with Fika.
 | **SPT** 4.1 | **Required** | |
 | **[Hideout Interiors](https://github.com/JRS-Mods/HideoutInteriors)** 0.2.0+ | **Required** | Its decor panel's **Defences** tab is where you place sandbags, steel barricades, barbed wire and the mounted gun. Your moved, hidden and decorated things are in the siege as you left them. Without it, this mod doesn't load. |
 | **Fika** | Optional | Co-op: the host runs the siege and everyone defends the host's hideout. Everyone needs the same version of this mod. |
-| **[Hideout Extensions](https://github.com/JRS-Mods/HideoutExtensions)** 1.3+ | Optional | Your built rooms are in the siege, and attackers can tunnel into one of them as a second way in. |
+| **[Hideout Extensions](https://github.com/JRS-Mods/HideoutExtensions)** 1.3+ | Optional | Only needed if you want them to breach through other walls: with its rooms built, they tunnel up to one and blow through its wall. Without it, their second way in is your Emergency Wall door. Your built rooms are in the siege too. |
 | **SAIN** 4.5 (with BigBrain) | Optional | Smarter attackers. The siege steers them towards you when SAIN would have them sit in cover. |
 | **Black Division** | Optional | The attackers from wave 3 on. Without it, Raiders and Rogues come instead. |
 | ↳ MoreBots (with its patcher), WTT CommonLib, WTT ContentBackport, SAIN | Needed by Black Division | Black Division won't load without all of these, and you get Raiders and Rogues. |
@@ -29,13 +29,23 @@ For SPT 4.1. Works alone or with Fika.
 
 The door is whichever one your Security level has: wood, grille or steel. An unbuilt Security station gets the wood one. You can make it hold out longer: see [Upgrading the front door](#upgrading-the-front-door).
 
+![The charge goes off, BREACH, and the first wave comes through the front door](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/03_breach.gif)
+
 **The dark.** Black Division cut the power a few seconds before they come in ("THEY'VE CUT THE POWER"): every light goes out for everyone, and the mounted gun stops minding the door by itself (you can still work it). It stays cut for the rest of the raid: the generator won't switch back on. Before that, with a generator built, you can switch the power off yourself (walk up to it and use it) and back on whenever you like, and the dark is worth it against scavs: they've nothing but the light on their gun, if they have one, and can't see past 20 metres by it. A scav without one is all but blind. Black Division (and Raiders and Rogues standing in for them) come with night vision (on their helmet's mount, or a head-strap set if they've no helmet), down while it's dark. You'll want a flashlight or night vision of your own.
+
+![The generator goes off, the hideout goes dark, and night vision comes on](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/02_lights_out.gif)
 
 **Blasts hurt.** Within 16 metres you're concussed for a while, and within 12 metres with a clear view you're blinded for a few seconds. Within about 4 metres on the charge's side you're wounded too, badly up close (attackers as well as you); the door or barricade it's on shields whoever's behind it. Don't stand and watch the door.
 
+![Their charge glows red on the door beside you, then blows](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/06_blown_up.gif)
+
 **Shutting a door won't save you.** If a closed door is the only thing keeping attackers from you, one of them walks up, sets a charge on it and backs off, and it blows 5 seconds later. Whoever's sent to do it is one who can't see any of you, and if one of you comes into sight on his way he drops it and fights. "THEY'RE BREACHING" shows when he's at the door and kneeling to set it. Kill him before the charge is on (on his way, or while he kneels) and there's no breach ("BREACH STOPPED" if he'd started setting it), for a few seconds until the next one tries; once it's on, it goes off whatever happens to him. A charge only ever goes on by hand: one who can't get to the door gives up and another tries.
 
+![WAVE 3, then THEY'RE BREACHING as one of them sets a charge on a shut door](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/05_wave_3.gif)
+
 **Bring your own armoury.** Whatever is on your real weapon racks is on them in the siege, and your mannequins stand there dressed in their loadouts. Walk up to one to take a piece at a time or the lot with one press. You also get up to 4 spare magazines per gun from the top level of your stash, as long as they fit. Set your racks up in the real hideout before you start. Only what you take is at risk: pick something up and die, and it's gone, but anything left on the racks stays yours. In co-op, it's the host's racks.
+
+![Taking a rifle off the weapon rack, then a mannequin's whole loadout in one press](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/01_gear_up.gif)
 
 **Your hideout fights back.**
 - **Spare magazines:** with no room for a magazine on a rack, you're offered a swap for your emptiest one, which drops on the floor.
@@ -51,6 +61,8 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 - **Mounted gun:** at Security level 2 or higher, a heavy machine gun, if you've put one in: Mounted gun is in Hideout Interiors' decor panel, Defences tab, and the one you place is where it stands, facing the way you turned it. Without one placed, there's no gun. While nobody's on it and the power's on, it minds the door by itself: it slowly swings to the nearest attacker it can see within 24 metres, takes a second to settle, and fires short, loose bursts: 30 rounds a wave, topped up every break, and never with one of you in the way. It holds them up rather than clearing the room; someone on it does far better. Walk up and use **Operate** to take it over.
 - **Second way in:** from wave 2, about half of each wave comes another way. With Hideout Extensions' rooms built, they've dug a tunnel up to the wall of one of them, a room picked at random each invasion (one well away from the front door, where there's a choice): as that wave starts, the wall's blown and they come through it. The hole's ragged and scorched, and through it there's a dug tunnel with a bank of earth across it; they wait round the far side of the bank, out of your sight. You can't go into the tunnel, or past the cultist room's gate where the rest wait: walking in stops you where you were. The tunnel is never dug right alongside another room. Otherwise, if your Emergency Wall has its door, they blow that from the side you aren't on. Either way there's a warning and a short fuse, and there's never more than the one: the front door and this.
 
+  ![THEY'RE COMING THROUGH A WALL: the second way in](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/04_through_the_wall.gif)
+
 **Watch the red lamp.** A charge's lamp blinks and beeps faster as it counts down, and stays on just before it goes off.
 
 **Attackers load up front.** Everyone the whole siege will send is loaded on the loading screen, which makes it about 10 seconds longer, so the game doesn't freeze when a wave arrives. Each wave then comes in during the break and waits out of sight: past the cultist room's gate, and in the tunnel or behind the Emergency Wall for those coming the second way. Leaving by the blown door during a break, or shooting one of them while they wait, starts the wave straight away.
@@ -58,6 +70,8 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 ## Losing
 
 If you die in the siege, you lose what you carried, as in any raid, and more: while you were down they went through your stash and took the most valuable things (not money, and not cases with things in them), they wrecked part of your hideout on the way out, and you come round badly hurt (and hungry and thirsty), so you'll want to heal up before your next raid. In the end-of-raid screens, after your experience and before the one to heal up, **Hideout Overrun** shows what they took (and what it was worth), what they wrecked, the state you came round in and what your Security and Medstation did for you; there's a message with it in your mail too.
+
+![Hideout Overrun: what they took from your stash, what they wrecked, and the state you came round in](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/07_overrun_report.png)
 
 The better defended the hideout they broke into, the more they take; a better Security station keeps more of it safe.
 
