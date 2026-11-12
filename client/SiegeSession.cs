@@ -227,7 +227,8 @@ namespace HideoutSiege
                         else if (item.Parent?.Container?.ParentItem is Item holder && holder.Id.ToString().StartsWith(SiegeIds.GearPrefix)) added.Add(item);
                     }
                 }
-            var deposited = SiegeStash.Contents();
+            var deposited = new List<Item>();
+            SiegeStash.Split(untouched, added, deposited);
             // Held out: your own things you left lying about (a bag you filled and dropped) are yours to keep too.
             var left = SiegeState.Phase == SiegePhase.Won ? SiegeGear.LeftLying(world.MainPlayer) : new List<Item>();
             Plugin.Log.LogInfo($"[siege] Telling the server what's still on your racks: {lying} things ({untouched.Count} items, with what's in them); to keep, {added.Count} things you put in them, {deposited.Count} in your stash and {left.Count} of your own left lying about.");

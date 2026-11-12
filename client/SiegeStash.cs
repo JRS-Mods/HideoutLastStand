@@ -15,7 +15,8 @@ namespace HideoutSiege
     /// Your stash, in the siege. Walk up to the Stash station and Open stash: what you put in it is in your real stash
     /// afterwards, whether you hold out or not, so between waves and in the minute after the last one you can put away
     /// what you've looted. It's a box the server brings in with the rest of the siege's loot, kept out of sight inside the
-    /// station. It starts empty: what's already in your stash stays where it is. In co-op it's the host's.
+    /// station. It holds a copy of your stash as you keep it: what's taken out of it is gone from the real one at the end, unless
+    /// it's put back or left lying in the hideout (the racks work the same way). In co-op it's the host's.
     /// </summary>
     internal static class SiegeStash
     {
@@ -84,14 +85,49 @@ namespace HideoutSiege
             });
         }
 
-        /// <summary>What's in it now, each thing at the top of it (what's in or on those comes with them).</summary>
+        /// <summary>
+        /// What's in it now, for the server. Copies of what was in your stash, still in it as they were (moved about in it,
+        /// or taken out and put back, is the same): untouched, so the real ones stay. New things put into one of those (in a
+        /// bag of yours, say): added. New things put straight in: deposited (what's in or on those comes with them).
+        /// </summary>
+        internal static void Split(List<string> untouched, List<Item> added, List<Item> deposited)
+        {
+            // Only while it's still where it was put: carried off, it's on someone, and goes with them.
+            if (box == null || !(box.Item is CompoundItem container) || !ReferenceEquals(box.Item.Owner, box.ItemOwner)) return;
+            foreach (var grid in container.Grids)
+                foreach (var top in grid.Items)
+                {
+                    if (!IsCopy(top))
+                    {
+                        deposited.Add(top);
+                        continue;
+                    }
+                    foreach (var item in top.GetAllItems())
+                    {
+                        if (ReferenceEquals(item, top)) untouched.Add(item.Id);
+                        else if (IsCopy(item) && CopiesUpTo(item, top)) untouched.Add(item.Id);
+                        else if (!IsCopy(item) && item.Parent?.Container?.ParentItem is Item holder && IsCopy(holder) && CopiesUpTo(holder, top)) added.Add(item);
+                    }
+                }
+        }
+
+        /// <summary>What's in it now, each thing at the top of it.</summary>
         internal static List<Item> Contents()
         {
             var found = new List<Item>();
-            // Only while it's still where it was put: carried off, it's on someone, and goes with them.
             if (box == null || !(box.Item is CompoundItem container) || !ReferenceEquals(box.Item.Owner, box.ItemOwner)) return found;
             foreach (var grid in container.Grids) found.AddRange(grid.Items);
             return found;
+        }
+
+        private static bool IsCopy(Item item) => item?.Id != null && item.Id.ToString().StartsWith(SiegeIds.GearPrefix);
+
+        // Every container between this and the top is a copy too: something of yours inside a new bag isn't where it was.
+        private static bool CopiesUpTo(Item item, Item top)
+        {
+            for (Item at = item; at != null && !ReferenceEquals(at, top); at = at.Parent?.Container?.ParentItem as Item)
+                if (!IsCopy(at)) return false;
+            return true;
         }
 
         internal static void Reset() => box = null;

@@ -19,6 +19,17 @@ namespace HideoutSiege
             var harmony = new Harmony(Plugin.Id + ".compat");
             Patch(harmony, "SAIN's location check", "SAIN.Components.LocationClass", "parseLocation", nameof(SainLocation));
             Patch(harmony, "ORBIT's bot brain", "Orbit.Brain.OrbitBrainLayer", "IsActive", nameof(OrbitLayer));
+            // ORBIT also puts bots to "sleep" and moves them itself, by its own map of waypoints. The hideout has none (its
+            // grid is 1x1), so a sleeping attacker's every route was swapped for one from ORBIT's waypoint 12 m off, and he
+            // stood still with a route to you. And it skips the legs of any bot it counts as its own.
+            Patch(harmony, "ORBIT's sleeping bots", "Orbit.Systems.NativeGhostSystem", "CanSleep", nameof(OrbitNoSleep));
+            Patch(harmony, "ORBIT's bot legs", "Orbit.Core.BotRoster", "IsOrbitActive", nameof(OrbitNotActive));
+            // That check is small enough to be folded into ORBIT's own patch, out of reach of the one above: so its patch too.
+            Patch(harmony, "ORBIT's skipped steps", "Orbit.Patches.ManualFixedUpdateSkipPatch", "PatchPrefix", nameof(OrbitLegsRun));
+            // SAIN skips the game's walking for any bot it counts as in a fight, as its own fighting moves it. But the siege's
+            // layer is above SAIN's, so while it's walking an attacker to you, SAIN's isn't running and nothing moved him: he
+            // stood with a route to you and never took a step (most of those "isn't getting anywhere"). Its legs run then.
+            Patch(harmony, "SAIN's walking", "SAIN.Patches.Movement.BotMoverManualFixedUpdatePatch", "PatchPrefix", nameof(SainLegs));
         }
 
         private static void Patch(Harmony harmony, string what, string typeName, string method, string prefix, string fallbackTypeName = null)
@@ -54,6 +65,35 @@ namespace HideoutSiege
 
         // ORBIT plans routes across zones the hideout doesn't have, and its bots would stand idle. Bots stay under SAIN or the game's own AI here.
         private static bool OrbitLayer(ref bool __result)
+        {
+            if (!SiegeLauncher.Selected) return true;
+            __result = false;
+            return false;
+        }
+
+        private static bool OrbitNoSleep(ref bool __result)
+        {
+            if (!SiegeLauncher.Selected) return true;
+            __result = false;
+            return false;
+        }
+
+        private static bool SainLegs(object __0, ref bool __result)
+        {
+            if (!SiegeLauncher.Selected || !(__0 is BotMover mover) || !SiegePush.Walking(mover._owner)) return true;
+            __result = true;
+            return false;
+        }
+
+        // ORBIT's prefix says whether the game's own step runs: in a siege, always.
+        private static bool OrbitLegsRun(ref bool __result)
+        {
+            if (!SiegeLauncher.Selected) return true;
+            __result = true;
+            return false;
+        }
+
+        private static bool OrbitNotActive(ref bool __result)
         {
             if (!SiegeLauncher.Selected) return true;
             __result = false;

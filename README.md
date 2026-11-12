@@ -23,7 +23,7 @@ For SPT 4.1. Works alone or with Fika.
 
 1. **The alert.** When your hideout is invaded, a banner appears on the menus. Click **Start the Defense**, or **Later** to hide it until your next raid. When you're not under attack, the main menu shows a countdown to the next one. In co-op, the host starts it and the others join through Fika's server browser as usual.
 2. **The security camera.** A few seconds: a scav walks down the stairwell to your front door with his gun on his back and the charge in his hand, sets it on the door and walks back up. The feed cuts out and you wake up by the bed. Space skips it. Nobody can be hurt while it plays.
-3. **Get ready.** You have 60 seconds. Your guns and spare magazines are on the weapon racks, and your armour, rig, backpack and helmet are at the gear rack, with everything still in them. Just pick them up: nothing needs searching. Guns are ready to fire, with your fullest spare magazine in and a round chambered. Meds and injectors are in your pockets where they fit, so their quick slots stay set. Without a built rack, those things are on the floor by the bed instead. The door is locked until the charge goes off, and it beeps for the last 10 seconds.
+3. **Get ready.** You have 60 seconds. Your guns and spare magazines are on the weapon racks, and your armour, rig, backpack and helmet are at the gear rack, with everything still in them. Just pick them up: nothing needs searching. Guns are ready to fire, with your fullest spare magazine in and a round chambered. Meds and injectors are in your pockets where they fit, so their quick slots stay set. Haven't built a weapon rack yet? You keep your guns on you. No gear stand? You keep your armour, rig, backpack and helmet on. So you can defend from your first day. The door is locked until the charge goes off, and it beeps for the last 10 seconds.
 4. **The breach.** The door blows, and so does the gate of the cultist room at the top of the stairs: the attackers have been waiting past it, out of sight, and they come through the cultist room, down the stairwell and through the front door. They know you're there. Each wave ends when all its attackers are dead, then you get 25 seconds to heal, reload and loot.
 5. **The end.** Hold through the last wave and you have a minute to loot (and put what you want in your stash: see [What it costs and pays](#what-it-costs-and-pays)) before you leave as **Survived**. Press F10 to leave sooner. If everyone dies, the raid ends as a normal death.
 
@@ -105,7 +105,7 @@ It's a real raid, so **you bring your own gear and lose it if you die**. Anythin
 
 **Holding the hideout pays in what they brought.** There's no reward by message: you keep what you loot from the attackers. After the last wave you have a minute to strip them, and there are two ways to keep more than you can carry:
 
-- **Your stash:** walk up to the Stash station and **Open stash**. Whatever you put in it is in your real stash afterwards (in co-op, the host's). It works between waves too, and what's in it is kept even if you go down later. If your stash is full, what doesn't fit comes by message instead. It starts empty: what's already in your stash stays where it is.
+- **Your stash:** walk up to the Stash station and **Open stash**. Whatever you put in it is in your real stash afterwards (in co-op, the host's). It works between waves too, and what's in it is kept even if you go down later. If your stash is full, what doesn't fit comes by message instead. It holds your real stash, laid out as you keep it: take out whatever you need (a gun, ammo, meds). Anything you take out is gone from your stash at the end: you have it if you get out with it, and lose it if you die with it. Put it back, or drop it somewhere in the hideout, and it stays yours.
 - **Bags from your racks:** fill a backpack or rig from your gear stands and drop it anywhere in the hideout, then fill the next: what you put in them goes into your stash afterwards, and the bags stay on your stands as they were.
 - **Your own gear:** after holding out, anything of your own that you left lying in the hideout (the gear you came in with, laid out on the racks, and whatever you've stuffed in it) goes into your stash too. Lose, and it's lost, as in any raid.
 
@@ -144,6 +144,7 @@ Press F12 (BepInEx Configuration Manager) and look under "Tushonka: Hideout Last
 | Setting | Default | What it does |
 |---|---|---|
 | Opening cinematic | On | Plays the security camera and the wake-up. |
+| Announcements | On | The big messages across the screen (THEY'RE BREACHING, BREACH, and so on). Off hides them; the wave counter and timers stay. |
 | Volume | 0.8 | The siren and stingers. |
 | Seconds to prepare | 60 | From waking up to the door blowing. |
 | Seconds between waves | 25 | Time to heal, reload and loot. |

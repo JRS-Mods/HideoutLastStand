@@ -17,12 +17,12 @@ namespace HideoutSiege
     public sealed class Plugin : BaseUnityPlugin
     {
         public const string Id = "jrs.hideoutsiege";
-        public const string Version = "0.1.1";
+        public const string Version = "0.1.2";
 
         internal static ManualLogSource Log;
         internal static string Folder;
         internal static Plugin Instance;
-        internal static ConfigEntry<bool> Cinematic;
+        internal static ConfigEntry<bool> Cinematic, Announcements;
         internal static ConfigEntry<float> Volume, PrepTime, WaveDelay, LootTime;
         internal static ConfigEntry<int> MaxAlive;
         internal static ConfigEntry<KeyCode> LeaveKey;
@@ -34,6 +34,7 @@ namespace HideoutSiege
             Log = Logger;
             Folder = Path.GetDirectoryName(Info.Location);
             Cinematic = Config.Bind("Siege", "Opening cinematic", true, "Play the opening cinematic. Space skips it.");
+            Announcements = Config.Bind("Siege", "Announcements", true, "Show the big messages across the screen, like THEY'RE BREACHING and BREACH. The wave counter and timers stay either way.");
             Volume = Config.Bind("Siege", "Volume", .8f, new ConfigDescription("How loud the siren and stingers are.", new AcceptableValueRange<float>(0f, 1f)));
             PrepTime = Config.Bind("Siege", "Seconds to prepare", 60f, new ConfigDescription("From waking up to the door blowing.", new AcceptableValueRange<float>(10f, 300f)));
             WaveDelay = Config.Bind("Siege", "Seconds between waves", 25f, new ConfigDescription("Time to heal, reload and loot.", new AcceptableValueRange<float>(0f, 180f)));

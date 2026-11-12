@@ -171,7 +171,7 @@ namespace HideoutSiege
                 shownBanner = SiegeState.Banner;
                 bannerSince = Time.time;
             }
-            if (Time.time < SiegeState.BannerUntil && !string.IsNullOrEmpty(SiegeState.Banner))
+            if (Plugin.Announcements.Value && Time.time < SiegeState.BannerUntil && !string.IsNullOrEmpty(SiegeState.Banner))
             {
                 float a = Mathf.Clamp01((SiegeState.BannerUntil - Time.time) / .6f) * Mathf.Clamp01((Time.time - bannerSince) / .15f);
                 float size = 42f * unit, y = h * .24f;

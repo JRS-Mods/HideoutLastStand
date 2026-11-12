@@ -731,12 +731,35 @@ namespace HideoutSiege
                 if (data == null || data.Count == 0) { Plugin.Log.LogError("[siege] Couldn't get a bot from the server."); return; }
                 if (finished) return;
                 foreach (var profile in data.Profiles) SiegeNvg.Equip(profile);
-                var point = spawnPoints[0];
+                var point = staging ? HiddenSpawn() : spawnPoints[0];
                 arriving.Add(Time.time);
                 spawner.SpawnBotsInZoneOnPositions(new List<ISpawnPoint> { point.SpawnPoint }, SiegeMap.Zone, data, OnSpawned);
             }
             catch (Exception e) { Plugin.Log.LogError("[siege] Spawning failed: " + e); }
             finally { spawning--; }
+        }
+
+        private readonly Dictionary<Vector3, SpawnPointMarker> hiddenMarkers = new Dictionary<Vector3, SpawnPointMarker>();
+        private int hiddenNext;
+
+        // Where a wave being staged appears: past the cultist room's gate, out of everyone's sight. They used to appear on
+        // the stairs, which can be seen from inside once the front door's blown (or through a grille door), and a bot is
+        // held still until he's moved to where he waits, so he could be shot as he appeared. The stairs if nowhere's hidden.
+        private SpawnPointMarker HiddenSpawn()
+        {
+            var spots = SiegeEntries.GateHolding;
+            for (int i = 0; i < spots.Count && SiegeMap.Zone != null; i++)
+            {
+                Vector3 p = spots[(hiddenNext + i) % spots.Count];
+                if (SiegeMoves.Seen(p)) continue;
+                // Not on top of anyone: those waiting at the gate stand on these same spots.
+                if (attackers.Any(b => b != null && !b.IsDead && (b.Position - p).sqrMagnitude < 1f)) continue;
+                hiddenNext = (hiddenNext + i + 1) % spots.Count;
+                if (!hiddenMarkers.TryGetValue(p, out var marker) || marker == null)
+                    hiddenMarkers[p] = marker = SiegeMap.Marker(SiegeMap.Zone, p, "siege_hidden_" + hiddenMarkers.Count);
+                return marker;
+            }
+            return spawnPoints[0];
         }
 
         // Not straight away: the game is still in the middle of registering this bot when we find out.
@@ -799,7 +822,9 @@ namespace HideoutSiege
             else
             {
                 wayIn[bot] = Way.Stairs;
+                // Up the stairs where none of you can see him from inside (through the blown front door, say), if there's one.
                 spot = HoldingSpot(staged);
+                for (int i = 1; i < 20 && SiegeMoves.Seen(spot); i++) spot = HoldingSpot(staged + i);
             }
             SiegeMoves.Put(bot, spot);
             // The one on the camera already faces down the stairs, so he sets off as it comes on rather than turning first.
@@ -1377,6 +1402,20 @@ namespace HideoutSiege
         private static bool Prefix(IPlayer person, ref bool __result)
         {
             if (person == null || !person.IsAI || !SiegeLauncher.Selected) return true;
+            __result = false;
+            return false;
+        }
+    }
+
+    // The game's other check, by role and side, which SAIN goes by: Black Division count scavs as enemies, so with scavs
+    // from an earlier wave still about, the Black Division wave turned on them. Attackers are all on one side.
+    [HarmonyLib.HarmonyPatch(typeof(BotsGroup), nameof(BotsGroup.IsPlayerEnemy))]
+    internal static class AttackersNotEnemiesPatch
+    {
+        [HarmonyLib.HarmonyPrefix]
+        private static bool Prefix(IPlayer player, ref bool __result)
+        {
+            if (player == null || !player.IsAI || !SiegeLauncher.Selected || !SiegeMoves.Attacker(player.AIData?.BotOwner)) return true;
             __result = false;
             return false;
         }

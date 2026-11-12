@@ -212,26 +212,7 @@ namespace HideoutSiege
             EntrancePoints.AddRange(FindEntrances());
             foreach (Vector3 p in EntrancePoints)
             {
-                var marker = SpawnPointMarker.Create(new SpawnPointParams
-                {
-                    Id = "siege_entrance_" + i,
-                    Position = p,
-                    Rotation = 0,
-                    Sides = EPlayerSideMask.All,
-                    Categories = ESpawnCategoryMask.Bot,
-                    Infiltration = "siege",
-                    BotZoneName = zone.name,
-                    DelayToCanSpawnSec = 0f,
-                    CorePointId = 1,
-                    ColliderParams = new SpawnSphereParams { Center = Vector3.zero, Radius = 1f },
-                }, zone.transform);
-                var collider = marker.gameObject.AddComponent<SphereCollider>();
-                collider.isTrigger = true;
-                collider.radius = 1f;
-                AccessTools.Field(typeof(SpawnPointMarker), "_collider")?.SetValue(marker, collider);
-                marker.BotZone = zone;
-                zone.SpawnPointMarkers.Add(marker);
-                Entrances.Add(marker);
+                Entrances.Add(Marker(zone, p, "siege_entrance_" + i));
                 i++;
             }
             zone.CenterOfSpawnPoints = Entrances.Count > 0 ? Entrances[0].transform.position : Vector3.zero;
@@ -251,6 +232,31 @@ namespace HideoutSiege
             way.InitPoints();
             zone.PatrolWays = new[] { way };
             return zone;
+        }
+
+        /// <summary>A place in the siege's zone that the game can spawn a bot at.</summary>
+        internal static SpawnPointMarker Marker(BotZone zone, Vector3 p, string id)
+        {
+            var marker = SpawnPointMarker.Create(new SpawnPointParams
+            {
+                Id = id,
+                Position = p,
+                Rotation = 0,
+                Sides = EPlayerSideMask.All,
+                Categories = ESpawnCategoryMask.Bot,
+                Infiltration = "siege",
+                BotZoneName = zone.name,
+                DelayToCanSpawnSec = 0f,
+                CorePointId = 1,
+                ColliderParams = new SpawnSphereParams { Center = Vector3.zero, Radius = 1f },
+            }, zone.transform);
+            var collider = marker.gameObject.AddComponent<SphereCollider>();
+            collider.isTrigger = true;
+            collider.radius = 1f;
+            AccessTools.Field(typeof(SpawnPointMarker), "_collider")?.SetValue(marker, collider);
+            marker.BotZone = zone;
+            zone.SpawnPointMarkers.Add(marker);
+            return marker;
         }
 
         // Everyone comes down the stairs behind the front door, out of sight of it.

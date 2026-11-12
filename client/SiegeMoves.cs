@@ -110,11 +110,79 @@ namespace HideoutSiege
             Plugin.Log.LogInfo($"[siege] Kept a {bot?.Profile?.Info?.Settings?.Role} from going through a wall: {from:F1} to {to:F1} ({by}; {stopped} so far).");
         }
 
-        internal static void Reset() => stopped = 0;
+        internal static void Reset()
+        {
+            stopped = 0;
+            DoorDetours = 0;
+        }
 
         private static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
 
         internal static bool Watching(BotMover mover) => mover?._owner != null && SiegeLauncher.InSiege;
+
+        /// <summary>One of the siege's attackers, in a siege.</summary>
+        internal static bool Attacker(BotOwner bot) => bot != null && SiegeLauncher.InSiege && SiegeDirector.Instance != null && SiegeDirector.Instance.IsAttacker(bot);
+
+        internal static int DoorDetours;
+    }
+
+    // Within about 10 m of a door, the game's door handling takes a bot's walking over: it switches the bot's legs to their
+    // "near a door" state and walks it to the door to open it, and routes the siege gives it go to the other state, which
+    // nothing follows. So a bot came through the tunnel's wall and stood behind the earth bank (the room's door was in
+    // range), or came in the front door and walked off the other way toward one. The siege handles doors itself (a shut
+    // one is off its floor and gets blown), so its attackers leave them to it.
+    [HarmonyPatch(typeof(BotDoorOpener), nameof(BotDoorOpener.UpdateDoorInteractionStatus))]
+    internal static class NoDoorDetourPatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(BotDoorOpener __instance, ref DoorInteractionStatus __result)
+        {
+            var bot = __instance._owner;
+            if (!SiegeMoves.Attacker(bot)) return true;
+            if (bot.Mover != null && bot.Mover.CurrentState == EBotMoverState.NearDoor) bot.Mover.SetMoverState(EBotMoverState.Default);
+            __result = DoorInteractionStatus.CanRun;
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(BotDoorOpener), nameof(BotDoorOpener.TryPassCurrentDoor))]
+    internal static class NoDoorPassPatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(BotDoorOpener __instance, ref bool __result)
+        {
+            if (!SiegeMoves.Attacker(__instance._owner)) return true;
+            __result = false;
+            return false;
+        }
+    }
+
+    // Whether an attacker's legs have had their physics step lately, or another mod's skipped it: for the log when he's stuck.
+    [HarmonyPatch(typeof(BotMover), nameof(BotMover.ManualFixedUpdate))]
+    internal static class LegsRanPatch
+    {
+        internal static readonly System.Collections.Generic.Dictionary<BotOwner, (float Ran, float Skipped)> Last = new System.Collections.Generic.Dictionary<BotOwner, (float, float)>();
+
+        [HarmonyPostfix]
+        private static void Postfix(BotMover __instance, bool __runOriginal)
+        {
+            var bot = __instance._owner;
+            if (!SiegeMoves.Attacker(bot)) return;
+            Last.TryGetValue(bot, out var was);
+            Last[bot] = __runOriginal ? (Time.time, was.Skipped) : (was.Ran, Time.time);
+        }
+    }
+
+    [HarmonyPatch(typeof(BotMover), nameof(BotMover.SetMoverState))]
+    internal static class NoNearDoorStatePatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(BotMover __instance, EBotMoverState state)
+        {
+            if (state != EBotMoverState.NearDoor || !SiegeMoves.Attacker(__instance._owner)) return true;
+            if (SiegeMoves.DoorDetours++ == 0) Plugin.Log.LogInfo("[siege] Kept an attacker on the siege's route rather than the game's walk to a door.");
+            return false;
+        }
     }
 
     // The game's walking puts a bot back on the floor's mesh after each step. Not through anything solid.

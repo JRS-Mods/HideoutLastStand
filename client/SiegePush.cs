@@ -27,7 +27,7 @@ namespace HideoutSiege
             public float LastSeen = -100f, NextLook, StillSince = -1f, NextNote, NextRescue, CutUntil;
             // Seeing you; going for you (not a rally point); and, from its last walk toward you, cut off from you.
             public bool Seeing, ToYou, Cut;
-            public Vector3 WasAt;
+            public Vector3 WasAt, NextCorner;
         }
 
         private static readonly Dictionary<BotOwner, Track> tracks = new Dictionary<BotOwner, Track>();
@@ -73,6 +73,7 @@ namespace HideoutSiege
         {
             tracks.Clear();
             orders.Clear();
+            routed.Clear();
             Rally = null;
             shutOutAt = null;
         }
@@ -165,8 +166,15 @@ namespace HideoutSiege
         // Along the siege's own floor, as far toward the spot as it goes: up to a shut door, if that's what's in the way (the
         // breachers' job). The game's own route-finding goes by its cover points instead, which here would have them walk
         // into a wall, or give up and jump them somewhere else.
+        // When each bot was last given a route by the siege: its legs must run then, whatever its own AI thinks.
+        private static readonly Dictionary<BotOwner, float> routed = new Dictionary<BotOwner, float>();
+
+        /// <summary>Whether the siege is walking this bot right now (routed in the last moment).</summary>
+        internal static bool Walking(BotOwner bot) => bot != null && routed.TryGetValue(bot, out float at) && Time.time - at < 1.6f;
+
         internal static UnityEngine.AI.NavMeshPathStatus Route(BotOwner bot, Vector3 target)
         {
+            routed[bot] = Time.time;
             const int all = UnityEngine.AI.NavMesh.AllAreas;
             if (!UnityEngine.AI.NavMesh.SamplePosition(bot.Position, out var on, 1.5f, all)) return UnityEngine.AI.NavMeshPathStatus.PathInvalid;
             Vector3 start = on.position;
@@ -186,6 +194,7 @@ namespace HideoutSiege
             if (!UnityEngine.AI.NavMesh.CalculatePath(start, to, all, route) || route.status == UnityEngine.AI.NavMeshPathStatus.PathInvalid || route.corners.Length < 2)
                 return UnityEngine.AI.NavMeshPathStatus.PathInvalid;
             bot.GoToByWay(route.corners, .3f);
+            if (tracks.TryGetValue(bot, out var given)) given.NextCorner = route.corners[1];
             return route.status;
         }
 
@@ -208,7 +217,48 @@ namespace HideoutSiege
             }
             if (Time.time - track.StillSince < 8f || Time.time < track.NextNote) return;
             track.NextNote = Time.time + 30f;
-            Plugin.Log.LogInfo($"[siege] A {bot.Profile.Info.Settings.Role} at {bot.Position:F1} isn't getting anywhere toward {target:F1}: route {status}, {(orders.ContainsKey(bot) ? "on a job" : "looking for you")}.");
+            var mover = bot.Mover;
+            string legs = mover == null ? "no legs" : $"legs {mover.CurrentState}{(mover.Pause ? " paused" : "")}{(mover.HasPathAndNoComplete ? "" : " no path")}{(mover.IsMoving ? "" : " not moving")}, {(new Vector2(mover.PositionOnWay.x - bot.Position.x, mover.PositionOnWay.z - bot.Position.z).magnitude):F1} m off its way";
+            string body = "";
+            try
+            {
+                var path = mover?.ActualPathController?.CurPath;
+                var player = bot.GetPlayer;
+                body = $", corner {(path == null ? "-" : $"{path.CurIndex}/{path.Length}")}, body {player.MovementContext?.CurrentState?.Name} speed {player.Speed:F2} pose {player.PoseLevel:F2}"
+                    + $"{(mover != null && mover.Blocked ? " blocked" : "")}{(mover != null && !mover.IsImpostorWorks ? " no motion" : "")}, state {bot.BotState}, hands {player.HandsController?.GetType().Name}";
+            }
+            catch (Exception e) { body = ", " + e.Message; }
+            Plugin.Log.LogInfo($"[siege] A {bot.Profile.Info.Settings.Role} at {bot.Position:F1} isn't getting anywhere toward {target:F1}: route {status}, {(orders.ContainsKey(bot) ? "on a job" : "looking for you")}, {legs}{body}{InTheWay(bot)}{(LegsRanPatch.Last.TryGetValue(bot, out var legsRan) ? $". Legs last stepped {Time.time - legsRan.Ran:F1} s ago, last skipped {Time.time - legsRan.Skipped:F1} s ago" : ". Legs never stepped")}.");
+        }
+
+        // What a stalled bot is up against on its way to its next corner: anything solid at all, named, so a piece of the
+        // hideout its walking can't get past (but its floor goes through) can be found.
+        private static readonly RaycastHit[] wayHits = new RaycastHit[8];
+
+        private static string InTheWay(BotOwner bot)
+        {
+            try
+            {
+                var curPath = bot.Mover.ActualPathController?.CurPath;
+                Vector3 corner = curPath != null ? curPath.CurrentCorner() : bot.Mover.CurrentCornerPoint, from = bot.Position;
+                Vector3 way = corner - from;
+                way.y = 0f;
+                float length = Mathf.Min(way.magnitude, 1.5f);
+                string where = $", next corner {corner:F1} ({way.magnitude:F1} m)";
+                if (length < .05f) return where;
+                int n = Physics.CapsuleCastNonAlloc(from + Vector3.up * .5f, from + Vector3.up * 1.4f, .3f, way.normalized, wayHits, length, ~0, QueryTriggerInteraction.Ignore);
+                var named = new List<string>();
+                for (int i = 0; i < n; i++)
+                {
+                    var c = wayHits[i].collider;
+                    if (c == null || c.GetComponentInParent<Player>() != null) continue;
+                    Transform root = c.transform;
+                    while (root.parent != null && root.parent.parent != null) root = root.parent;
+                    named.Add($"{c.name} [{LayerMask.LayerToName(c.gameObject.layer)}] of {root.name} at {wayHits[i].distance:F2} m");
+                }
+                return where + (named.Count > 0 ? ", in the way: " + string.Join("; ", named) : ", nothing in the way");
+            }
+            catch (Exception e) { return ", " + e.Message; }
         }
 
         private const float RescueAfter = 5f, RescueReach = 10f;
@@ -275,7 +325,11 @@ namespace HideoutSiege
             }
             bot.Mover.SetTargetMoveSpeed(1f);
             bot.Sprint(sprint);
-            bot.Steering.LookToMovingDirection();
+            // Standing still, "where it's moving" is nowhere, and the game won't start a bot off down its route until it faces
+            // along it: so one that's stood a moment faces its next corner instead.
+            if (tracks.TryGetValue(bot, out var standing) && standing.StillSince > 0f && Time.time - standing.StillSince > 2f && standing.NextCorner != Vector3.zero)
+                bot.Steering.LookToPoint(standing.NextCorner + Vector3.up * 1.4f);
+            else bot.Steering.LookToMovingDirection();
         }
     }
 }

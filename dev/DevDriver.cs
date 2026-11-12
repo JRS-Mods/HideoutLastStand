@@ -649,6 +649,12 @@ namespace HideoutSiege.Dev
                     return;
                 }
                 case 1:
+                    // Something of yours out of the stash first (in the break before the first wave), then something in.
+                    if (stashPhase == SiegePhase.Prep) StartCoroutine(TakeOut(me, StashBox()));
+                    stashStep = 10;
+                    stashAt = Time.time + 2f;
+                    return;
+                case 10:
                     StartCoroutine(PutAway(me, StashBox(), "the stash"));
                     stashStep = 2;
                     stashAt = Time.time + 2f;
@@ -705,6 +711,29 @@ namespace HideoutSiege.Dev
             float giveUp = Time.time + 2f;
             while (Time.time < giveUp && !Inside(item, container)) yield return null;
             Logger.LogInfo($"[test] Put {name} ({item.Id}) in {what}: {(Inside(item, container) ? "it's in" : "it isn't")}.");
+        }
+
+        // The first thing of yours in the stash that you've room for, on to you.
+        private System.Collections.IEnumerator TakeOut(Player me, EFT.Interactive.LootItem from)
+        {
+            if (from == null || !(from.Item is EFT.InventoryLogic.CompoundItem box)) { Logger.LogInfo("[test] No stash to take from."); yield break; }
+            var controller = me.InventoryController;
+            int yours = 0;
+            foreach (var grid in box.Grids)
+                foreach (var item in System.Linq.Enumerable.ToList(grid.Items))
+                {
+                    if (!item.Id.ToString().StartsWith(SiegeIds.GearPrefix)) continue;
+                    yours++;
+                    var move = EFT.InventoryLogic.ItemManipulator.QuickFindAppropriatePlace(item, controller, new[] { controller.Inventory.Equipment }, EFT.InventoryLogic.ItemManipulator.EMoveItemOrder.PickUp, true);
+                    if (move.Failed || !controller.CanExecute(move.Value)) continue;
+                    string name = item.ShortName.Localized();
+                    controller.RunNetworkTransaction(move.Value, null);
+                    float giveUp = Time.time + 2f;
+                    while (Time.time < giveUp && Inside(item, box)) yield return null;
+                    Logger.LogInfo($"[test] The stash had {yours}+ things of yours in it; took {name} ({item.Id}) out: {(Inside(item, box) ? "it's still in" : "it's on me")}.");
+                    yield break;
+                }
+            Logger.LogInfo($"[test] The stash had {yours} things of yours in it, and none I had room for.");
         }
 
         // Something from your pockets, or else a magazine off the racks.

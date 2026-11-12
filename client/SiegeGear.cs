@@ -16,7 +16,7 @@ namespace HideoutSiege
     /// <summary>
     /// You were asleep, so your gear's where you left it: guns and magazines on the weapon racks, armour, rig, helmet and
     /// backpack on the gear rack, with everything still in them. Meds and injectors are in your pockets. A rack that isn't
-    /// built leaves those things on the floor by the bed. Nothing needs searching and the guns are ready to fire.
+    /// built leaves those things on you. Nothing needs searching and the guns are ready to fire.
     /// Each player does this for themselves, through the game's normal item drop, so everyone else sees it too.
     /// </summary>
     internal static class SiegeGear
@@ -72,10 +72,18 @@ namespace HideoutSiege
             foreach (var bind in controller.Inventory.FastAccess.BoundItems)
                 if (bind.Value != null) binds[bind.Key] = bind.Value;
 
-            // Out of the rig and backpack before those go anywhere.
-            var magazines = gear.SelectMany(item => item.GetAllItems()).OfType<Magazine>().Where(m => !(m.Parent.Container is Slot)).ToList();
-
             var racks = new SiegeRacks(me);
+            // With nothing built to put them on, they stay on you: guns in hand without a weapon rack, armour, rig and bag
+            // worn without a gear stand. So a siege before you've built those starts the way you came in, not with it all
+            // on the floor by the bed.
+            if (!racks.HaveGunRacks) guns.Clear();
+            if (!racks.HaveStand) gear.Clear();
+
+            // Out of the rig and backpack before those go anywhere (and only when there's a rack for them).
+            var magazines = racks.HaveGunRacks
+                ? gear.SelectMany(item => item.GetAllItems()).OfType<Magazine>().Where(m => !(m.Parent.Container is Slot)).ToList()
+                : new List<Magazine>();
+
             var everything = new List<(Item Item, Func<LootItem, bool> Spot)>();
             foreach (var gun in guns) everything.Add((gun, racks.HangGun));
             foreach (var magazine in magazines) everything.Add((magazine, racks.HangMagazine));
@@ -373,6 +381,7 @@ namespace HideoutSiege
                 var marker = points.FirstOrDefault(p => p.name == "SpawnPoint" && p.transform.root.name == root);
                 if (marker == null) continue;
                 levels.TryGetValue(type, out int level);
+                if (level < 1) continue;
                 int index = Mathf.Clamp(level, 1, Across.Length) - 1;
                 float step = marker.GetComponentInParent<HideoutArea>()?.AreaTemplate?.stashGridStep ?? .25f;
                 racks.Add(new Rack { Marker = marker.transform, Step = step, Taken = new bool[Across[index], Down[index]] });
@@ -391,8 +400,11 @@ namespace HideoutSiege
 
             var stands = points.Where(p => p.name.StartsWith("Stand") && p.transform.root.name == "26_equipment_presets_stand").OrderBy(p => p.name).ToList();
             standNames.AddRange(stands.Select(p => p.transform));
-            if (stands.Count > 0) stand = stands[seat % stands.Count].transform;
+            if (stands.Count > 0 && levels.TryGetValue(EAreaType.EquipmentPresetsStand, out int standLevel) && standLevel >= 1) stand = stands[seat % stands.Count].transform;
         }
+
+        internal bool HaveGunRacks => racks.Count > 0;
+        internal bool HaveStand => stand != null;
 
         // Turned the way the game turns a gun for its rack: side on, by the opposite of the turn it's shown at in a preview.
         internal bool HangGun(LootItem loot)
