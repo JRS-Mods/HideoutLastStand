@@ -56,10 +56,13 @@ namespace HideoutSiege
             return Physics.Raycast(at + Vector3.up * .5f, Vector3.down, out var floor, 3f, EFTHardSettings.Instance.MOVEMENT_MASK, QueryTriggerInteraction.Ignore) ? floor.point + Vector3.up * .05f : at;
         }
 
-        /// <summary>For the Stash station: Open stash, for the host (whose stash it is) while the box is still there.</summary>
+        /// <summary>
+        /// For the Stash station: Open stash, for the player whose stash it is (the host's, or on a Fika headless the player it's
+        /// hosting for) while the box is still there.
+        /// </summary>
         internal static AvailableInteractionState ActionsFor(GamePlayerOwner owner)
         {
-            if (Net.IsClient) return new AvailableInteractionState { Error = "It's the host's stash" };
+            if (!SiegeOwner.IsMe) return new AvailableInteractionState { Error = Net.IsClient && SiegeOwner.Said == null ? "It's the host's stash" : "It's not your stash" };
             if (box == null || !(box.Item is CompoundItem container)) return null;
             return new AvailableInteractionState
             {

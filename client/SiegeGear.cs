@@ -52,7 +52,9 @@ namespace HideoutSiege
         {
             var world = Singleton<GameWorld>.Instance;
             var me = world?.MainPlayer;
-            if (me == null) yield break;
+            if (world == null) yield break;
+            // A Fika headless has no player of its own, but the rack gear and the stash box still go where they belong.
+            if (me == null) { PutUpRackGear(world, null, new SiegeRacks(null)); yield break; }
             var controller = me.InventoryController;
             var equipment = controller.Inventory.Equipment;
 
@@ -125,7 +127,7 @@ namespace HideoutSiege
                 try
                 {
                     count++;
-                    MakeKnown(controller, loot.Item);
+                    if (controller != null) MakeKnown(controller, loot.Item);
                     int mannequin = MannequinOf(loot);
                     bool put = mannequin != 0 ? racks.AtMannequin(loot, mannequin)
                         : loot.Item is Weapon ? racks.HangGun(loot) : loot.Item is Magazine ? racks.HangMagazine(loot) : racks.StandUp(loot);
@@ -135,11 +137,11 @@ namespace HideoutSiege
             }
             if (count > 0) Plugin.Log.LogInfo($"[siege] Brought in {count} things from your racks and stash: {onRacks} put up, the rest by the beds.");
             SiegeStash.Tuck(world, controller);
-            // Only the host has the items they're dressed from. On other games the gear stays at the foot of the stand.
-            if (!Net.IsClient) Plugin.Instance.StartCoroutine(SiegeMannequins.Build(world.MainPlayer));
+            // Only the player whose hideout it is has the items they're dressed from. On other games the gear stays at the foot of the stand.
+            if (SiegeOwner.IsMe && world.MainPlayer != null) Plugin.Instance.StartCoroutine(SiegeMannequins.Build(world.MainPlayer));
             // What's still on the racks is told to the server the moment you die, while it's all still here to look at (the
-            // raid's end can come after the world's gone). Not in co-op: a friend can still take things after you go down.
-            if (!Net.IsClient && world.MainPlayer != null)
+            // raid's end can come after the world's gone). Not when hosting for friends: they can still take things after you go down.
+            if (SiegeOwner.IsMe && world.MainPlayer != null)
                 world.MainPlayer.OnPlayerDeadOrUnspawn += _ => { if (!Net.HadPeers) SiegeBackend.ReportRackGear(); };
         }
 
@@ -372,7 +374,7 @@ namespace HideoutSiege
         {
             // Co-op players each start from a different rack and stand, as far as they go round. Everyone works this out the same.
             var everyone = SiegeDirector.Defenders().Select(p => p.ProfileId).OrderBy(id => id, StringComparer.Ordinal).ToList();
-            int seat = Mathf.Max(0, everyone.IndexOf(me.ProfileId));
+            int seat = me == null ? 0 : Mathf.Max(0, everyone.IndexOf(me.ProfileId));
 
             var points = Object.FindObjectsOfType<StashItemModelSpawnPoint>();
             var levels = HideoutCopy.Levels();

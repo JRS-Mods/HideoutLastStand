@@ -10,7 +10,7 @@ For SPT 4.1. Works alone or with Fika.
 |---|---|---|
 | **SPT** 4.1 | **Required** | |
 | **[Hideout Interiors](https://github.com/JRS-Mods/HideoutInteriors)** 0.2.0+ | **Required** | Its decor panel's **Defences** tab is where you place sandbags, steel barricades, barbed wire and the mounted gun. Your moved, hidden and decorated things are in the siege as you left them. Without it, this mod doesn't load. |
-| **Fika** | Optional | Co-op: the host runs the siege and everyone defends the host's hideout. Everyone needs the same version of this mod. A Fika headless can't host a siege yet: host it from your own game. |
+| **Fika** | Optional | Co-op: the host runs the siege and everyone defends the host's hideout. Everyone needs the same version of this mod. A Fika headless can host it too: it's your hideout they attack. |
 | **[Hideout Extensions](https://github.com/JRS-Mods/HideoutExtensions)** 1.3+ | Optional | Only needed if you want them to breach through other walls: with its rooms built, they tunnel up to one and blow through its wall. Without it, their second way in is your Emergency Wall door. Your built rooms are in the siege too. |
 | **SAIN** 4.5 (with BigBrain) | Optional | Smarter attackers. The siege steers them towards you when SAIN would have them sit in cover. |
 | **Black Division** | Optional | The attackers from wave 3 on. Without it, Raiders and Rogues come instead. |
@@ -132,7 +132,7 @@ What you need is in the table at the top ([What you need](#what-you-need)). In m
 - **SAIN:** attackers run on SAIN if it's installed. SAIN's bots hold cover while they can't see you, so the siege takes over an attacker that hasn't seen any of you for a few seconds and walks it toward the nearest of you, blowing doors on the way; once one of you is in sight, SAIN fights. This uses BigBrain, which SAIN needs anyway.
 - **Bot mods with gear of their own:** a type whose bots come without weapons (its gear comes from a mod that isn't installed) is noticed on the loading screen, and others are sent in its place.
 - **ORBIT:** ORBIT's bot brain stays out of the siege, because the hideout has none of the zones it plans routes across. Your other raids aren't affected.
-- **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter. A Fika headless can't host one yet: it would defend its own empty hideout instead of yours, so choose Host Raid rather than the headless.
+- **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter. A Fika headless can host it too: start the defence from the alert, then pick the headless. It's your hideout they attack, with your racks and your stash (only you can open it), and the result is yours.
 - **Tushonka Territories:** its faction spawns and kill counter stay out of the siege, which has its own attackers and isn't one of its territories. Your other raids aren't affected.
 - **Hideout Extensions:** the rooms you've built are in the siege, with their doors and lamps, and your areas stand where you moved them. Attackers can follow you into the rooms, and you wake up wherever your Rest Space is. Needs Hideout Extensions 1.3 or later.
 - **Hideout Interiors:** the things you've moved, given to other areas or hidden are as you left them, and your decorations are there too, and so are your Defences. Required: 0.2.0 or later.

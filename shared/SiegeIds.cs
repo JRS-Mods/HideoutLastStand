@@ -12,6 +12,9 @@ namespace HideoutSiege
         public const string RouteGear = "/hideoutsiege/gear";
         public const string RouteDoor = "/hideoutsiege/door";
         public const string RouteDefeatSeen = "/hideoutsiege/defeatseen";
+        // A player's hideout, said by their game as they start the defence; and, for a Fika headless, whose siege it's hosting.
+        public const string RouteLayout = "/hideoutsiege/layout";
+        public const string RouteOwner = "/hideoutsiege/owner";
         // Copies of what's on your real racks, as they appear in a siege, all start with this.
         public const string GearPrefix = "5151e9e0";
         // Your stash in the siege: a box kept inside the Stash station. What you put in it goes to your real stash.

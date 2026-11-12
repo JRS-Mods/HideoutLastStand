@@ -77,6 +77,8 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
     private static void AfterLootGenerated(MongoId sessionId, string name, bool generateLoot, LocationBase __result)
     {
         if (!generateLoot || !string.Equals(name, SiegeIds.LocationId, StringComparison.OrdinalIgnoreCase)) return;
+        // On a Fika headless it's the racks and stash of the player it's hosting for.
+        sessionId = new MongoId(SiegeOwners.Of(sessionId.ToString()));
         // The racks first: the spare magazines they take from the stash aren't in the stash box as well (or you'd take both).
         HashSet<string> onRacks = [];
         try { onRacks = instance?.AddTo(sessionId, __result) ?? []; }

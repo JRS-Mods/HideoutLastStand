@@ -119,6 +119,8 @@ namespace HideoutSiege.Fika
         public string[] SurfaceIds;
         // What other mods add to the host's hideout (Hideout Extensions' rooms, Hideout Interiors' things), by mod.
         public string[] CopyNames, CopySnapshots;
+        // Whose hideout it is: the host's, or on a headless the player it's hosting for. Empty from an older host.
+        public string OwnerId;
         // The network's strings stop at 65,535 bytes, and a decorated hideout can say more than that.
         private const int Chunk = 16000;
 
@@ -137,6 +139,7 @@ namespace HideoutSiege.Fika
                 writer.Put(chunks);
                 for (int c = 0; c < chunks; c++) writer.Put(text.Substring(c * Chunk, System.Math.Min(Chunk, text.Length - c * Chunk)));
             }
+            writer.Put(OwnerId ?? "");
         }
 
         public void Deserialize(NetDataReader reader)
@@ -162,6 +165,7 @@ namespace HideoutSiege.Fika
                 for (int c = 0; c < chunks; c++) text.Append(reader.GetString());
                 CopySnapshots[i] = text.ToString();
             }
+            OwnerId = reader.AvailableBytes > 0 ? reader.GetString() : null;
         }
     }
 
@@ -229,7 +233,7 @@ namespace HideoutSiege.Fika
             }));
             network.RegisterPacket<SiegeSandbagPacket, NetPeer>((p, from) => Safely(() => Net.ReceivedSandbags(new Vector3(p.X, p.Y, p.Z), p.Yaw)));
             network.RegisterPacket<SiegeTurretPacket, NetPeer>((p, from) => Safely(() => { if (!host) SiegeTurret.Heard(p.From, p.Aim, p.Shots); }));
-            network.RegisterPacket<SiegeLayoutPacket, NetPeer>((p, from) => Safely(() => { if (!host) Net.ReceivedLayout(p.Types, p.Levels, p.SurfaceTypes, p.SurfaceIds, p.CopyNames, p.CopySnapshots); }));
+            network.RegisterPacket<SiegeLayoutPacket, NetPeer>((p, from) => Safely(() => { if (!host) Net.ReceivedLayout(p.Types, p.Levels, p.SurfaceTypes, p.SurfaceIds, p.CopyNames, p.CopySnapshots, p.OwnerId); }));
         }
 
         private void Destroyed(FikaNetworkManagerDestroyedEvent e)
@@ -304,6 +308,7 @@ namespace HideoutSiege.Fika
             var copies = HideoutCopy.Copies();
             packet.CopyNames = System.Linq.Enumerable.ToArray(copies.Keys);
             packet.CopySnapshots = System.Linq.Enumerable.ToArray(copies.Values);
+            packet.OwnerId = SiegeOwner.ProfileId;
             return packet;
         }
 

@@ -201,11 +201,11 @@ public sealed class SiegeStore(RandomUtil random, ISptLogger<SiegeStore> logger)
 }
 
 [Injectable]
-public sealed class SiegeRouter(JsonUtil json, SiegeStore store, SiegeRackGear gear) : StaticRouter(json,
+public sealed class SiegeRouter(JsonUtil json, SiegeStore store, SiegeRackGear gear, SiegeOwners owners) : StaticRouter(json,
 [
     new RouteAction<SiegeGearData>(SiegeIds.RouteGear, (_, data, session, _, _) =>
     {
-        gear.Finish(session, data);
+        gear.Finish(new MongoId(SiegeOwners.Of(session.ToString())), data);
         return new ValueTask<string>("{}");
     }),
     new RouteAction<SiegeEmptyData>(SiegeIds.RouteState, (_, _, session, _, _) => new ValueTask<string>(JsonSerializer.Serialize(store.Status(session.ToString())))),
@@ -221,7 +221,15 @@ public sealed class SiegeRouter(JsonUtil json, SiegeStore store, SiegeRackGear g
     }),
     new RouteAction<SiegeResultData>(SiegeIds.RouteResult, (_, data, session, _, _) =>
     {
-        store.Finish(session, data);
+        // A headless's own result isn't anyone's: the players it hosted for each say how it went for them.
+        if (!SiegeOwners.IsHeadless(session.ToString())) store.Finish(session, data);
         return new ValueTask<string>("{}");
     }),
+    new RouteAction<SiegeLayoutData>(SiegeIds.RouteLayout, (_, data, session, _, _) =>
+    {
+        owners.Keep(session.ToString(), data);
+        return new ValueTask<string>("{}");
+    }),
+    new RouteAction<SiegeEmptyData>(SiegeIds.RouteOwner, (_, _, session, _, _) =>
+        new ValueTask<string>(owners.Owner(session.ToString()) is { } owner ? JsonSerializer.Serialize(owner) : "{}")),
 ]);

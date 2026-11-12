@@ -47,6 +47,38 @@ namespace HideoutSiege
             // Its kill counter would send the siege's kills to its server as a battle on a map it doesn't have, which throws
             // there; and one left running by a raid that never loaded made the next raid's start log an error.
             Patch(harmony, "Tushonka Territories' kill counter", "TerritoryClient.Services.KillCounter", "StartRaid", nameof(TerritoriesNoCount));
+            // HollywoodFX leaves the camera, lighting and effects alone in the hideout, and it tells by the kind of game world.
+            // The siege's is a raid's, so it put its raid camera work on the hideout: the screen went black behind the security
+            // camera, and the wave timer and the pause menu broke. To it the siege is the hideout.
+            // Its flag is set as the world wakes, so this goes after it.
+            HollywoodInHideout(harmony);
+            // HollywoodGraphics, which comes with it, puts a bloom effect on the camera as a raid starts. On the hideout's camera
+            // it fails half way, after adding it: the screen was black, and it threw an error every frame after. Not in a siege.
+            Patch(harmony, "HollywoodGraphics' camera effects", "HollywoodGraphics.GraphicsControllerInitPatch", "Postfix", nameof(NotInSiege));
+        }
+
+        private static bool NotInSiege() => !SiegeLauncher.Selected;
+
+        private static FieldInfo hollywoodHideout;
+
+        private static void HollywoodInHideout(Harmony harmony)
+        {
+            try
+            {
+                hollywoodHideout = AccessTools.TypeByName("HollywoodFX.Patches.GameWorldAwakePrefixPatch") is Type type ? AccessTools.Field(type, "IsHideout") : null;
+                if (hollywoodHideout == null) return;
+                var awake = AccessTools.Method(typeof(EFT.GameWorld), "Awake");
+                harmony.Patch(awake, new HarmonyMethod(typeof(SiegeCompat), nameof(HollywoodSiegeIsHideout)) { priority = Priority.Last });
+                Plugin.Log.LogInfo("[compat] Handling HollywoodFX's raid effects.");
+            }
+            catch (Exception e) { Plugin.Log.LogWarning("[compat] HollywoodFX's raid effects: " + e.Message); }
+        }
+
+        private static void HollywoodSiegeIsHideout()
+        {
+            if (!SiegeLauncher.Selected) return;
+            hollywoodHideout.SetValue(null, true);
+            Plugin.Log.LogInfo("[compat] HollywoodFX is treating the siege as the hideout.");
         }
 
         private static bool IsSiegeMap(string locationId) => string.Equals(locationId, SiegeIds.LocationId, StringComparison.OrdinalIgnoreCase);

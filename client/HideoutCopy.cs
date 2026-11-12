@@ -18,7 +18,13 @@ namespace HideoutSiege
 
         internal static Dictionary<EAreaType, int> Levels()
         {
-            if (HostLayout != null) return HostLayout;
+            SiegeOwner.Ask();
+            return HostLayout ?? OwnLevels();
+        }
+
+        /// <summary>This profile's own stations, whoever's hideout the siege is in.</summary>
+        internal static Dictionary<EAreaType, int> OwnLevels()
+        {
             var levels = new Dictionary<EAreaType, int>();
             var app = Singleton<ClientApplication<IEftSession>>.Instance as TarkovApplication;
             var areas = app?.Session?.Profile?.Hideout?.Areas;
@@ -88,8 +94,12 @@ namespace HideoutSiege
             TellLampsAboutPower(true);
             var hideout = Object.FindObjectOfType<HideoutController>(true);
             if (hideout != null && hideout._globalLighting != null)
+            {
                 foreach (var pair in hideout._globalLighting)
                     if (pair.Value != null) pair.Value.SetActive(pair.Key == best);
+                Plugin.Log.LogInfo($"[map] The hideout's lighting: {string.Join(", ", hideout._globalLighting.Where(p => p.Value != null).Select(p => p.Key))}; using {best}.");
+            }
+            else Plugin.Log.LogWarning("[map] The hideout has no lighting of its own to switch on.");
             return best;
         }
 
@@ -142,12 +152,21 @@ namespace HideoutSiege
 
         internal static Dictionary<string, string> Copies()
         {
+            SiegeOwner.Ask();
             if (HostCopies != null) return HostCopies;
-            if (copies != null) return copies;
-            copies = new Dictionary<string, string>();
+            return copies ?? (copies = Snapshot(true));
+        }
+
+        /// <summary>
+        /// What this player's hideout has, read now: the front door, the invasion's roll and what other mods add.
+        /// <paramref name="useRoll"/>: whether this uses up the test driver's roll.
+        /// </summary>
+        internal static Dictionary<string, string> Snapshot(bool useRoll)
+        {
+            var copies = new Dictionary<string, string>();
             copies[DoorKey] = SiegeDoorUpgrades.Level().ToString();
             copies[SeedKey] = (NextRoll ?? new System.Random().Next(1, int.MaxValue)).ToString();
-            NextRoll = null;
+            if (useRoll) NextRoll = null;
             foreach (var copier in Copiers)
                 try
                 {
@@ -189,7 +208,13 @@ namespace HideoutSiege
 
         internal static Dictionary<EHideoutCustomizationType, string> Pack()
         {
-            if (HostPack != null) return HostPack;
+            SiegeOwner.Ask();
+            return HostPack ?? OwnPack();
+        }
+
+        /// <summary>This profile's own walls, floor and ceiling.</summary>
+        internal static Dictionary<EHideoutCustomizationType, string> OwnPack()
+        {
             var pack = new Dictionary<EHideoutCustomizationType, string>();
             var app = Singleton<ClientApplication<IEftSession>>.Instance as TarkovApplication;
             var chosen = app?.Session?.Profile?.Hideout?.GlobalCustomization;
@@ -237,7 +262,9 @@ namespace HideoutSiege
         {
             try
             {
-                if (HostPack == null && !Net.IsClient && await Load())
+                SiegeOwner.Ask();
+                // A headless has the player's it's hosting for already: those are read ahead the same.
+                if ((HostPack == null || SiegeOwner.OnHeadless) && !Net.IsClient && await Load())
                     Plugin.Log.LogInfo($"[map] Hideout copy: {loaded.Count} customised surfaces loaded ahead.");
             }
             catch (Exception e) { Plugin.Log.LogWarning("[map] Couldn't read your wall, floor and ceiling styles ahead: " + e.Message); }

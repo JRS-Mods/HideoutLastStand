@@ -104,8 +104,9 @@ namespace HideoutSiege
             SiegeExit.Leave(status);
         }
 
-        internal static async void ReceivedLayout(int[] types, int[] levels, int[] surfaceTypes, string[] surfaceIds, string[] copyNames, string[] copySnapshots)
+        internal static async void ReceivedLayout(int[] types, int[] levels, int[] surfaceTypes, string[] surfaceIds, string[] copyNames, string[] copySnapshots, string ownerId = null)
         {
+            SiegeOwner.Said = string.IsNullOrEmpty(ownerId) ? null : ownerId;
             var pack = new System.Collections.Generic.Dictionary<EFT.Hideout.EHideoutCustomizationType, string>();
             for (int i = 0; i < surfaceTypes.Length; i++) pack[(EFT.Hideout.EHideoutCustomizationType)surfaceTypes[i]] = surfaceIds[i];
             HideoutCopy.HostPack = pack;

@@ -82,6 +82,7 @@ namespace HideoutSiege
             SiegeCinematic.Active = false;
             SiegeExit.Reset();
             HideoutCopy.HostLayout = null;
+            SiegeOwner.Reset();
             SiegeState.Reset();
             SiegeHud.Black = SiegeHud.Static = 0f;
             SiegeHud.SecurityCam = false;
@@ -129,6 +130,8 @@ namespace HideoutSiege
 
         private static System.Collections.IEnumerator LeaveWhenClear(ExitStatus status)
         {
+            // A Fika headless ends the raid itself once everyone's left, and has no player of its own to leave with.
+            if (SiegeOwner.OnHeadless) { Plugin.Log.LogInfo($"[siege] The siege is over ({status}): the headless ends the raid once everyone's left."); yield break; }
             float giveUp = Time.time + 30f;
             while (Net.IsHost && Net.PeerCount > 0 && Time.time < giveUp) yield return new WaitForSeconds(.5f);
             if (Net.IsHost && Net.HadPeers) yield return new WaitForSeconds(5f);
@@ -211,7 +214,8 @@ namespace HideoutSiege
         internal static void ReportRackGear()
         {
             var world = Comfort.Common.Singleton<GameWorld>.Instance;
-            if (world == null || Net.IsClient) return;
+            // Whoever's hideout it is says: the host, or on a Fika headless the player it's hosting for.
+            if (world == null || !SiegeOwner.IsMe) return;
             var untouched = new List<string>();
             // Loot put into something from your racks that's still lying about (a bag you filled and left): it's kept too.
             var added = new List<Item>();

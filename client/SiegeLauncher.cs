@@ -54,6 +54,8 @@ namespace HideoutSiege
             if (saved == null) saved = new Saved(settings, offline);
             Prepare(settings, location);
             if (offline != null) Prepare(offline, location);
+            // In case a Fika headless hosts it: it needs to know what your hideout looks like.
+            SiegeOwner.Tell();
             AccessTools.Method(typeof(MainMenuShowOperation), "method_52").Invoke(menu, null);
             return true;
         }
