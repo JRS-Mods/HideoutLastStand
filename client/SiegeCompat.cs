@@ -32,6 +32,29 @@ namespace HideoutSiege
             Patch(harmony, "SAIN's walking", "SAIN.Patches.Movement.BotMoverManualFixedUpdatePatch", "PatchPrefix", nameof(SainLegs));
         }
 
+        private static bool earlyApplied;
+
+        /// <summary>For mods that act as the raid is being created, before the siege's map is built: once every plugin is loaded.</summary>
+        internal static void ApplyEarly()
+        {
+            if (earlyApplied) return;
+            earlyApplied = true;
+            var harmony = new Harmony(Plugin.Id + ".compat.early");
+            // Tushonka Territories looks the raid's map up in its own table of maps as the raid is created, and the siege's
+            // isn't in it: "Specified argument was out of the range of valid values", and Fika dropped the raid. Its own
+            // "no state for this map" path leaves its spawner switched off, which its other patches already allow for.
+            Patch(harmony, "Tushonka Territories' spawns", "TerritoryClient.Spawns.TerritoriesSpawnScenario", "Init", nameof(TerritoriesNoSpawns));
+            // Its kill counter would send the siege's kills to its server as a battle on a map it doesn't have, which throws
+            // there; and one left running by a raid that never loaded made the next raid's start log an error.
+            Patch(harmony, "Tushonka Territories' kill counter", "TerritoryClient.Services.KillCounter", "StartRaid", nameof(TerritoriesNoCount));
+        }
+
+        private static bool IsSiegeMap(string locationId) => string.Equals(locationId, SiegeIds.LocationId, StringComparison.OrdinalIgnoreCase);
+
+        private static bool TerritoriesNoSpawns(JsonType.LocationSettings.Location ____location) => !IsSiegeMap(____location?.Id);
+
+        private static bool TerritoriesNoCount(string __0) => !IsSiegeMap(__0);
+
         private static void Patch(Harmony harmony, string what, string typeName, string method, string prefix, string fallbackTypeName = null)
         {
             try

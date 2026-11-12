@@ -445,6 +445,14 @@ namespace HideoutSiege.Dev
                     catch (Exception) { }
                 }
             }
+            // On a Fika headless the driver only sets the test timings: there's no menu to drive and nothing to picture.
+            // The bots live on the headless, so auto-kill and the bot telemetry run there.
+            if (IsHeadless)
+            {
+                try { Telemetry(); }
+                catch (Exception e) { Logger.LogError(e); nextTelemetry = Time.realtimeSinceStartup + 10f; }
+                return;
+            }
             try { Step(); }
             catch (Exception e) { Logger.LogError(e); nextTry = Time.realtimeSinceStartup + 10f; }
             LogCinematic();
@@ -1138,6 +1146,9 @@ namespace HideoutSiege.Dev
         }
 
         private static bool IsCoopClient => Environment.GetEnvironmentVariable("SIEGE_ROLE") == "client";
+        private static bool IsHeadless => Environment.GetEnvironmentVariable("SIEGE_ROLE") == "headless";
+        // SIEGE_HEADLESS: ask a Fika headless to host the siege, then join it, as the "Use headless" toggle does.
+        private static bool UseHeadless => Environment.GetEnvironmentVariable("SIEGE_HEADLESS") != null;
 
         private static int Peers()
         {
@@ -1417,7 +1428,27 @@ namespace HideoutSiege.Dev
             var field = AccessTools.Field(ui.GetType(), "StartButton");
             var button = (field != null ? field.GetValue(ui) : AccessTools.Property(ui.GetType(), "StartButton").GetValue(ui)) as Button;
             if (button == null) return false;
+            var toggleField = AccessTools.Field(ui.GetType(), "DedicatedToggle");
+            var toggle = (toggleField != null ? toggleField.GetValue(ui) : AccessTools.Property(ui.GetType(), "DedicatedToggle")?.GetValue(ui)) as Toggle;
+            if (toggle != null)
+            {
+                if (UseHeadless && !toggle.interactable)
+                {
+                    if (Time.realtimeSinceStartup - startedAt < 20f) return false;
+                    Logger.LogError("[test] No headless is available to host the siege.");
+                    stage = 9;
+                    return false;
+                }
+                toggle.isOn = UseHeadless;
+            }
             button.onClick.Invoke();
+            if (UseHeadless)
+            {
+                // The headless hosts and Fika joins us to it by itself: there's no Start Raid of our own to press.
+                Logger.LogInfo("[test] Asked the headless to host the siege.");
+                stage = 3;
+                return false;
+            }
             return true;
         }
     }

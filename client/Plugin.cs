@@ -17,7 +17,7 @@ namespace HideoutSiege
     public sealed class Plugin : BaseUnityPlugin
     {
         public const string Id = "jrs.hideoutsiege";
-        public const string Version = "0.1.1";
+        public const string Version = "0.1.2";
 
         internal static ManualLogSource Log;
         internal static string Folder;
@@ -59,6 +59,9 @@ namespace HideoutSiege
             SiegeDoorUpgrades.Patch(new Harmony(Id + ".door"));
             Logger.LogInfo("Hideout Last Stand loaded.");
         }
+
+        // Every plugin has loaded by now, so other mods' types can be found by name.
+        private void Start() => SiegeCompat.ApplyEarly();
 
         private float nextSlow;
 
