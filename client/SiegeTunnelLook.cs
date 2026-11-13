@@ -13,7 +13,10 @@ namespace HideoutSiege
     {
         private const float Gap = 1.4f, BankDepth = .6f;
         private static readonly List<GameObject> made = new List<GameObject>();
-        private static Material dirt, timber, scorch, burnt;
+        private static readonly List<Mesh> shaped = new List<Mesh>();
+        private static Material dirt, timber, scorch, burnt, stone, bulb;
+        // How far the dug earth stands out from the flat lining behind it, and how close its lumps are.
+        private const float Rough = .2f, RoughEvery = .2f, FrameEvery = 1.6f;
 
         /// <summary>
         /// Lines the tunnel and puts the bank in (before the floor's walked, so it's walked round). Returns how far in from
@@ -43,16 +46,51 @@ namespace HideoutSiege
             }
             Slab(At(length - .04f, 0f, height / 2f), facing, new Vector3(width + .1f, height + .1f, .08f), dirt);
 
-            // A timber frame just inside the hole.
+            // Flat sheets look like a box, so the dug face goes over them: lumpy earth on both sides, the roof, the end and
+            // the floor (the floor barely, as it's walked on). Nothing here is solid: what's walked on is underneath.
             foreach (float side in new[] { -1f, 1f })
-                Slab(At(.55f, side * (width / 2f - .14f), (height - .1f) / 2f), facing, new Vector3(.16f, height - .1f, .16f), timber);
-            Slab(At(.55f, 0f, height - .22f), facing, new Vector3(width - .05f, .2f, .2f), timber);
+                Dug(At(0f, side * (width / 2f - .09f), 0f), outward, length, Vector3.up, height, -across * side, Rough, side > 0f ? 3 : 4);
+            Dug(At(0f, -width / 2f, height - .09f), outward, length, across, width, Vector3.down, Rough * .8f, 5);
+            Dug(At(length - .09f, -width / 2f, 0f), across, width, Vector3.up, height, -outward, Rough, 6);
+            Dug(At(0f, -width / 2f, .03f), outward, length, across, width, Vector3.up, .04f, 7);
+
+            // Timber frames holding it up, from just inside the hole to the end, with boards under the roof between them.
+            float before = -1f;
+            for (float d = .55f; d < length - .25f; d += FrameEvery)
+            {
+                float lean = Jitter(1.5f);
+                foreach (float side in new[] { -1f, 1f })
+                    Slab(At(d, side * (width / 2f - .16f), (height - .1f) / 2f), facing * Quaternion.Euler(0f, 0f, side * lean), new Vector3(.16f, height - .1f, .16f), timber);
+                Slab(At(d, 0f, height - .24f), facing * Quaternion.Euler(0f, Jitter(1f), lean), new Vector3(width - .08f, .2f, .2f), timber);
+                if (before > 0f)
+                    foreach (float side in new[] { -.75f, -.05f, .7f })
+                        Slab(At((before + d) / 2f, side + Jitter(.08f), height - .12f + Jitter(.015f)), facing * Quaternion.Euler(Jitter(1.5f), Jitter(2.5f), Jitter(3f)),
+                             new Vector3(.24f + Jitter(.04f), .035f, d - before + .25f), timber);
+                before = d;
+            }
 
             // The bank: across from one wall, leaving a way round at the other. Solid, and it stops bullets.
             float bank = Mathf.Clamp(length * .45f, 1.6f, 2.8f);
             float bankWidth = width - Gap;
             var heap = Slab(At(bank, -Gap / 2f, height / 2f), facing, new Vector3(bankWidth, height, BankDepth), dirt, solid: true);
             SiegeDefences.BulletBox(heap.transform, Vector3.zero, Vector3.one, EFT.Ballistics.MaterialType.Soil);
+            float bankEdge = -Gap / 2f + bankWidth / 2f;
+            Dug(At(bank - BankDepth / 2f - .02f, -width / 2f, 0f), across, bankWidth, Vector3.up, height, -outward, Rough * 1.2f, 8);
+            Dug(At(bank - BankDepth / 2f, bankEdge + .02f, 0f), outward, BankDepth, Vector3.up, height, across, Rough * .5f, 9);
+            Dug(At(bank + BankDepth / 2f + .02f, -width / 2f, 0f), across, bankWidth, Vector3.up, height, outward, Rough, 10);
+            // Stones and clods lying where they fell out of the digging: along the foot of the walls, mostly.
+            for (int i = 0; i < 22; i++)
+            {
+                float d = .3f + (float)random.NextDouble() * (length - .6f);
+                float side = (i % 3 == 0 ? Jitter(width / 2f - .4f) : (i % 2 == 0 ? 1f : -1f) * (width / 2f - .2f - (float)random.NextDouble() * .3f));
+                if (Mathf.Abs(d - bank) < BankDepth && side < bankEdge) continue;
+                float s = .07f + (float)random.NextDouble() * .16f;
+                Lump(At(d, side, s * .3f), Quaternion.Euler(Jitter(180f), Jitter(180f), Jitter(180f)), new Vector3(s * 1.3f, s * .8f, s), i, i % 4 == 0 ? dirt : stone);
+            }
+            // What they've been sitting on while they dug, past the bank where the lamp is.
+            float camp = Mathf.Min(bank + 1.3f, length - .5f);
+            Slab(At(camp + .3f, -width / 2f + .45f, .2f), facing * Quaternion.Euler(0f, 14f, 0f), new Vector3(.5f, .4f, .38f), timber);
+            Slab(At(camp + .26f, -width / 2f + .43f, .51f), facing * Quaternion.Euler(0f, -9f, 0f), new Vector3(.36f, .22f, .3f), timber);
             // Earth spilling down its front, so it reads as a heap rather than a wall.
             for (int i = 0; i < 4; i++)
                 Slab(At(bank - BankDepth / 2f - .2f - Jitter(.1f), -Gap / 2f + Jitter(bankWidth / 3f), .25f + Jitter(.1f)),
@@ -67,6 +105,10 @@ namespace HideoutSiege
             lamp.intensity = 1.1f;
             lamp.shadows = LightShadows.None;
             made.Add(lamp.gameObject);
+            // The lamp itself: a bare bulb on a flex from the roof, so the glow comes from something.
+            Vector3 hung = lamp.transform.position;
+            Lump(hung, Quaternion.identity, Vector3.one * .08f, -1, bulb);
+            Slab(hung + Vector3.up * ((y + height - hung.y) / 2f + .03f), Quaternion.identity, new Vector3(.012f, Mathf.Max(.05f, y + height - hung.y), .012f), timber);
             Physics.SyncTransforms();
             return bank;
         }
@@ -107,6 +149,68 @@ namespace HideoutSiege
         {
             foreach (var go in made) if (go != null) Object.Destroy(go);
             made.Clear();
+            foreach (var mesh in shaped) if (mesh != null) Object.Destroy(mesh);
+            shaped.Clear();
+        }
+
+        /// <summary>
+        /// A face of dug earth: a sheet from <paramref name="origin"/>, <paramref name="w"/> along <paramref name="right"/>
+        /// and <paramref name="h"/> along <paramref name="up"/>, pushed out toward <paramref name="normal"/> in lumps. It's
+        /// held close to flat at its edges, so the faces meet at the corners.
+        /// </summary>
+        private static void Dug(Vector3 origin, Vector3 right, float w, Vector3 up, float h, Vector3 normal, float rough, int seed)
+        {
+            if (w < .1f || h < .1f) return;
+            int nx = Mathf.Max(2, Mathf.CeilToInt(w / RoughEvery)) + 1, ny = Mathf.Max(2, Mathf.CeilToInt(h / RoughEvery)) + 1;
+            var points = new Vector3[nx * ny];
+            var map = new Vector2[nx * ny];
+            for (int j = 0; j < ny; j++)
+                for (int i = 0; i < nx; i++)
+                {
+                    float u = i / (nx - 1f) * w, v = j / (ny - 1f) * h;
+                    // Big swells, lumps on them, and the odd stone standing proud.
+                    float lump = Mathf.PerlinNoise(seed * 13.7f + u * .9f, seed * 5.3f + v * .9f) * .55f + Mathf.PerlinNoise(seed * 3.1f + u * 3.3f, 9f + v * 3.3f) * .3f
+                        + Mathf.PerlinNoise(seed + u * 8f, 40f + v * 8f) * .15f;
+                    if (Mathf.PerlinNoise(seed * 7.9f + u * 2.2f, 70f + v * 2.2f) > .72f) lump += .35f;
+                    float held = Mathf.Clamp01(Mathf.Min(Mathf.Min(u, w - u), Mathf.Min(v, h - v)) / .3f);
+                    points[j * nx + i] = origin + right * u + up * v + normal * (lump * rough * Mathf.Lerp(.2f, 1f, held));
+                    map[j * nx + i] = new Vector2(u / 1.3f, v / 1.3f);
+                }
+            bool asIs = Vector3.Dot(Vector3.Cross(right, up), normal) > 0f;
+            var triangles = new int[(nx - 1) * (ny - 1) * 6];
+            int t = 0;
+            for (int j = 0; j < ny - 1; j++)
+                for (int i = 0; i < nx - 1; i++)
+                {
+                    int a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+                    triangles[t++] = a; triangles[t++] = asIs ? b : c; triangles[t++] = asIs ? c : b;
+                    triangles[t++] = b; triangles[t++] = asIs ? d : c; triangles[t++] = asIs ? c : d;
+                }
+            var mesh = new Mesh { name = "Hideout Siege dug earth", vertices = points, uv = map, triangles = triangles };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            shaped.Add(mesh);
+            var go = new GameObject("Hideout Siege tunnel earth");
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = dirt;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            made.Add(go);
+        }
+
+        // A stone, a clod or the bulb: one of the broken lumps the blasts throw, lying still.
+        private static void Lump(Vector3 at, Quaternion turn, Vector3 size, int which, Material look)
+        {
+            var go = GameObject.CreatePrimitive(which < 0 ? PrimitiveType.Sphere : PrimitiveType.Cube);
+            go.name = "Hideout Siege tunnel";
+            Object.Destroy(go.GetComponent<Collider>());
+            if (which >= 0) go.GetComponent<MeshFilter>().sharedMesh = SiegeBlastLook.Rock(which);
+            go.transform.SetPositionAndRotation(at, turn);
+            go.transform.localScale = size;
+            var renderer = go.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = look;
+            if (which < 0) renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            made.Add(go);
         }
 
         private static GameObject Slab(Vector3 at, Quaternion turn, Vector3 size, Material look, bool solid = false)
@@ -155,6 +259,8 @@ namespace HideoutSiege
             timber = new Material(standard) { name = "Hideout Siege timber", color = Color.white, mainTexture = grain };
             timber.SetFloat("_Glossiness", .06f);
             timber.SetFloat("_Metallic", 0f);
+            stone = new Material(dirt) { name = "Hideout Siege stone", color = new Color(.62f, .62f, .64f), mainTextureScale = new Vector2(.5f, .5f) };
+            bulb = new Material(Shader.Find("Sprites/Default") ?? standard.shader) { name = "Hideout Siege bulb", color = new Color(1f, .86f, .6f) };
 
             // Round the hole (3.4 by 3 m, the hole 1.7 by 2.25 at the bottom middle): dark, fading out, clear inside it.
             const int w = 170, h = 150;

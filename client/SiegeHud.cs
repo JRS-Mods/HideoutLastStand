@@ -182,6 +182,17 @@ namespace HideoutSiege
                 SiegeUi.Fill(new Rect((w - bar) / 2f, y + size * 1.4f + 2f * unit, bar, 2f * unit), new Color(SiegeUi.Red.r, SiegeUi.Red.g, SiegeUi.Red.b, a * .85f));
             }
 
+            // Another player asking for something of yours: who, what, and the two keys.
+            var asking = SiegeAsk.Current;
+            if (asking != null)
+            {
+                float y = h * .56f, wide = 520f * unit, tall = 74f * unit;
+                SiegeUi.Fill(new Rect((w - wide) / 2f, y, wide, tall), new Color(0f, 0f, 0f, .55f));
+                SiegeUi.Fill(new Rect((w - wide) / 2f, y, wide, 2f * unit), new Color(SiegeUi.Red.r, SiegeUi.Red.g, SiegeUi.Red.b, .9f));
+                SiegeUi.Text(new Rect(0, y + 10f * unit, w, 24f * unit), $"{asking.Name} wants your {asking.What}", notice, 18f * unit, SiegeUi.Ink);
+                SiegeUi.Text(new Rect(0, y + 40f * unit, w, 22f * unit), $"{Plugin.AllowKey.Value}  ALLOW      {Plugin.DeclineKey.Value}  DECLINE      {SiegeUi.Clock(asking.Until - Time.time)}", label, 14f * unit, SiegeUi.Dim);
+            }
+
             if (Time.time < SiegeState.NoticeUntil && !string.IsNullOrEmpty(SiegeState.Notice))
             {
                 float a = Mathf.Clamp01((SiegeState.NoticeUntil - Time.time) / .4f);

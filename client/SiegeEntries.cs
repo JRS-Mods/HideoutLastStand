@@ -69,6 +69,8 @@ namespace HideoutSiege
             if (Vector3.Dot(p - gateCentre, gateBeyond) < .15f) return false;
             float floor = GateHolding.Min(h => h.y);
             if (p.y < floor - 1f || p.y > floor + 2.5f) return false;
+            // Round the gate and round where they wait, and no wider. "Everything on the far side of the gate" was tried: what's
+            // past it lies back over the hideout, and at the foot of the stairs, 12 m off and a floor down, it turned people back.
             return Flat(p - gateCentre).sqrMagnitude < 3f * 3f || GateHolding.Any(h => Flat(h - p).sqrMagnitude < 3.5f * 3.5f);
         }
         internal static Vector3 TunnelCharge => TunnelHole + TunnelOut * (Gap / 2f + .05f) + Vector3.up * 1.1f;
@@ -476,6 +478,9 @@ namespace HideoutSiege
             return true;
         }
 
+        /// <summary>What the built rooms' walls are made of, for the bits a blast throws off one.</summary>
+        internal static Material WallLook => WallMaterial();
+
         private static Material WallMaterial()
         {
             var root = GameObject.Find("Hideout extensions");
@@ -508,14 +513,19 @@ namespace HideoutSiege
         {
             var random = new System.Random(7);
             Material wall = WallMaterial();
-            for (int i = 0; i < 9; i++)
+            // Lumps rather than blocks: big ones against the foot of the hole, smaller ones thrown further into the room, and
+            // some back down the tunnel's mouth.
+            for (int i = 0; i < 26; i++)
             {
                 var chunk = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 chunk.name = "Hideout Siege rubble";
                 Object.Destroy(chunk.GetComponent<Collider>());
-                float s = .12f + (float)random.NextDouble() * .25f;
+                chunk.GetComponent<MeshFilter>().sharedMesh = SiegeBlastLook.Rock(i);
+                float far = (float)random.NextDouble();
+                float s = Mathf.Lerp(.34f, .08f, far) + (float)random.NextDouble() * .1f;
                 Vector3 across = Vector3.Cross(Vector3.up, TunnelOut);
-                Vector3 at = TunnelHole - TunnelOut * (.3f + (float)random.NextDouble() * 1.6f) + across * (((float)random.NextDouble() - .5f) * 2.2f);
+                float thrown = i % 5 == 4 ? -(.2f + (float)random.NextDouble() * .7f) : .15f + far * far * 3.2f;
+                Vector3 at = TunnelHole - TunnelOut * thrown + across * (((float)random.NextDouble() - .5f) * (1.5f + far * 1.6f));
                 chunk.transform.SetPositionAndRotation(at + Vector3.up * s * .3f, Quaternion.Euler((float)random.NextDouble() * 40f, (float)random.NextDouble() * 360f, (float)random.NextDouble() * 40f));
                 chunk.transform.localScale = new Vector3(s * 1.4f, s * .7f, s);
                 if (wall != null) chunk.GetComponent<MeshRenderer>().sharedMaterial = wall;

@@ -42,6 +42,14 @@ public sealed class SiegeDefeat(ItemHelper itemHelper, HandbookHelper handbook, 
     private static void AfterPmcRaid(MongoId sessionId, SptProfile fullServerProfile, bool isDead, string locationName)
     {
         if (!isDead || !string.Equals(locationName, SiegeIds.LocationId, StringComparison.OrdinalIgnoreCase)) return;
+        // It's the hideout of whoever started the defence: a friend who died helping loses what they carried and comes
+        // round as badly hurt, but nothing's taken from their stash and nothing of theirs is wrecked.
+        if (SiegeOwners.IsGuest(sessionId.ToString()))
+        {
+            try { instance?.HurtHelper(fullServerProfile.CharacterData?.PmcData); }
+            catch (Exception e) { instance?.Warn("Hideout Last Stand: couldn't settle a friend's death: " + e); }
+            return;
+        }
         try { instance?.Punish(sessionId, fullServerProfile.CharacterData?.PmcData); }
         catch (Exception e) { instance?.Warn("Hideout Last Stand: couldn't settle your defeat: " + e); }
     }
@@ -52,13 +60,24 @@ public sealed class SiegeDefeat(ItemHelper itemHelper, HandbookHelper handbook, 
     /// </summary>
     public static int MostTaken(int tier, int security) => Math.Max(2, 2 + Math.Clamp(tier, 1, 4) - (Math.Clamp(security, 0, 3) + 1) / 2);
 
+    // How much health you come round with: more with a better Medstation of your own.
+    private static double HealthLeft(int medstation) => .12 + .08 * medstation;
+
+    private void HurtHelper(PmcData? pmc)
+    {
+        if (pmc is null) return;
+        double health = HealthLeft(Level(pmc, HideoutAreas.MedStation));
+        Hurt(pmc, health);
+        logger.Info($"Hideout Last Stand: died helping in someone else's siege: what was carried is lost, and health is left at {health:P0}. Their stash and hideout aren't touched.");
+    }
+
     private void Punish(MongoId session, PmcData? pmc)
     {
         if (pmc?.Inventory?.Items is null) return;
         int security = Level(pmc, HideoutAreas.Security), medstation = Level(pmc, HideoutAreas.MedStation);
         int tier = store.LastTier(session.ToString());
         int take = MostTaken(tier, security);
-        double health = .12 + .08 * medstation;
+        double health = HealthLeft(medstation);
 
         var stolen = Steal(pmc, take);
         var wrecked = Wreck(pmc);
@@ -73,9 +92,9 @@ public sealed class SiegeDefeat(ItemHelper itemHelper, HandbookHelper handbook, 
         string what = stolen.Count == 0 ? "nothing worth taking" : string.Join(", ", stolen.Select(t => t.Name));
         string broke = wrecked.Count == 0 ? "" : " On the way out they wrecked your " + string.Join(" and ", wrecked.Select(w => $"{w.Name} ({w.Was} to {w.Now})")) + ".";
         mail.SendDirectNpcMessageToPlayer(session, "54cb50c76803fa8b248b4571", MessageType.MessageWithItems,
-            $"They overran your hideout. While you were down they went through your stash and took {what}.{broke} You came round badly hurt: patch yourself up before your next raid.",
+            $"They overran your hideout. While you were down they went through your stash, weapon racks and mannequins and took {what}.{broke} You came round badly hurt: patch yourself up before your next raid.",
             new List<Item>(), 604800);
-        logger.Info($"Hideout Last Stand: lost at tier {tier}. Taken from the stash ({take} at most): {what}.{broke} Health left at {health:P0}.");
+        logger.Info($"Hideout Last Stand: lost at tier {tier}. Taken from the stash, racks and mannequins ({take} at most): {what}.{broke} Health left at {health:P0}.");
     }
 
     private static int Level(PmcData pmc, HideoutAreas area) => pmc.Hideout?.Areas?.FirstOrDefault(a => a.Type == area)?.Level ?? 0;
@@ -112,13 +131,28 @@ public sealed class SiegeDefeat(ItemHelper itemHelper, HandbookHelper handbook, 
         return [what];
     }
 
-    // The most valuable things in the stash, each with whatever's fitted to it: not money, and not a case with things in it.
+    private const string WeaponRack = "24", SecondRack = "25", GearStands = "26";
+
+    // The most valuable things in the stash, on the weapon racks and on the mannequins, each with whatever's fitted to
+    // it: not money, and not a case with things in it. They go through all of it and take the best, wherever it was.
     private List<(string Name, double Worth)> Steal(PmcData pmc, int count)
     {
         var items = pmc.Inventory!.Items!;
         string stash = pmc.Inventory.Stash?.ToString() ?? "";
         var children = items.Where(i => i.ParentId is not null).ToLookup(i => i.ParentId!);
         var byId = items.ToDictionary(i => i.Id.ToString());
+        // What hangs on the racks, and what each mannequin wears.
+        var displayed = new HashSet<string>();
+        var areas = pmc.Inventory.HideoutAreaStashes;
+        if (areas is not null)
+        {
+            foreach (string rack in new[] { WeaponRack, SecondRack })
+                if (areas.TryGetValue(rack, out var id))
+                    displayed.UnionWith(children[id.ToString()].Select(i => i.Id.ToString()));
+            if (areas.TryGetValue(GearStands, out var stands))
+                foreach (var stand in children[stands.ToString()])
+                    displayed.UnionWith(children[stand.Id.ToString()].Select(i => i.Id.ToString()));
+        }
         bool InStash(Item item)
         {
             for (int depth = 0; depth < 12 && item.ParentId is not null; depth++)
@@ -133,7 +167,7 @@ public sealed class SiegeDefeat(ItemHelper itemHelper, HandbookHelper handbook, 
         double Value(Item item) => handbook.GetTemplatePrice(item.Template) * (item.Upd?.StackObjectsCount ?? 1) + Fitted(item).Sum(c => handbook.GetTemplatePrice(c.Template));
 
         var picked = items
-            .Where(i => i.Location is not null && InStash(i))
+            .Where(i => (i.Location is not null && InStash(i)) || displayed.Contains(i.Id.ToString()))
             .Where(i => !itemHelper.IsOfBaseclass(i.Template, BaseClasses.MONEY))
             .Where(i => !children[i.Id.ToString()].Any(c => c.Location is not null))
             .Select(i => (Item: i, Worth: Value(i)))

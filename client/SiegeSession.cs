@@ -117,8 +117,21 @@ namespace HideoutSiege
     internal static class SiegeExit
     {
         private static bool leaving;
+        // Goes up each raid, so a check left waiting from the last one knows it's not its raid any more.
+        private static int raid;
 
-        internal static void Reset() => leaving = false;
+        // From the moment the game's told to end the raid: the controls are held from then on (see HoldCommandPatch).
+        internal static bool Closing { get; private set; }
+
+        internal static void Reset()
+        {
+            leaving = Closing = false;
+            raid++;
+        }
+
+        // How long the game gets to take you out before it's taken to have got stuck partway.
+        private const float StuckAfter = 40f;
+        private static readonly System.Reflection.FieldInfo Dragging = AccessTools.Field(typeof(EFT.UI.ItemUiContext), "_dragItemContext");
 
         // Ends the raid. Fika won't let a host go before the people it's hosting, so the host waits for them to go first.
         internal static void Leave(ExitStatus status)
@@ -135,14 +148,79 @@ namespace HideoutSiege
             float giveUp = Time.time + 30f;
             while (Net.IsHost && Net.PeerCount > 0 && Time.time < giveUp) yield return new WaitForSeconds(.5f);
             if (Net.IsHost && Net.HadPeers) yield return new WaitForSeconds(5f);
+            yield return PutThingsDown();
+            int mine = raid;
+            var world = Singleton<GameWorld>.Instance;
+            string exitName = status == ExitStatus.Survived ? "Hideout defended" : null;
+            var game = Singleton<AbstractGame>.Instance as BaseLocalGame<EftGamePlayerOwner>;
             try
             {
-                var game = Singleton<AbstractGame>.Instance as BaseLocalGame<EftGamePlayerOwner>;
                 if (game == null) { Plugin.Log.LogWarning("[siege] No game to leave."); yield break; }
                 Plugin.Log.LogInfo($"[siege] Leaving the raid: {status}.");
-                game.Stop(game.PlayerOwner.Player.ProfileId, status, status == ExitStatus.Survived ? "Hideout defended" : null);
+                Closing = true;
+                game.Stop(game.PlayerOwner.Player.ProfileId, status, exitName);
             }
             catch (Exception e) { Plugin.Log.LogError("[siege] Leaving failed: " + e); }
+
+            // Leaving's a fade to black, then the game shutting things down. If that throws partway, it's left half gone:
+            // marked as leaving, so it turns down being asked again, and nothing to finish it. Then it's finished from here.
+            float until = Time.time + StuckAfter;
+            while (Time.time < until)
+            {
+                if (raid != mine) yield break;
+                yield return new WaitForSeconds(1f);
+            }
+            if (raid != mine || world == null || Singleton<GameWorld>.Instance != world || game == null || game.Status == GameStatus.Stopped) yield break;
+            Plugin.Log.LogWarning($"[siege] Still in the raid {StuckAfter:0}s after leaving ({game.Status}): finishing it off.");
+            try
+            {
+                var screens = EFT.UI.Screens.EftScreenManager.Instance;
+                if (screens != null) screens.CloseAllScreensForced();
+            }
+            catch (Exception e) { Plugin.Log.LogWarning("[siege] Closing the screens: " + e.Message); }
+            try
+            {
+                string profileId = game.PlayerOwner.Player.ProfileId;
+                // It got as far as the fade: what's left is the end itself.
+                if (game.Status == GameStatus.Stopping)
+                    game.GameEnd(profileId, status, exitName, 0f).ContinueWith(t => Plugin.Log.LogError("[siege] Finishing the raid failed: " + t.Exception),
+                        TaskContinuationOptions.OnlyOnFaulted);
+                // It didn't get going at all: ask again.
+                else game.Stop(profileId, status, exitName);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("[siege] Finishing the raid failed: " + e);
+                // The way out by hand stays open, rather than leaving you there for good, and you've your controls back.
+                leaving = Closing = false;
+                SiegeState.Notify($"Couldn't leave the raid: press {Plugin.LeaveKey.Value} to try again", 15f);
+            }
+        }
+
+        // Something held on the cursor in the inventory when the raid ends is what's left it stuck: the game tears the
+        // inventory down mid-move. So it waits (a little) for you to let go, and then shuts the inventory first.
+        private static System.Collections.IEnumerator PutThingsDown()
+        {
+            float until = Time.time + 5f;
+            while (Time.time < until && Holding()) yield return null;
+            if (Holding()) Plugin.Log.LogWarning("[siege] Leaving with something still held in the inventory.");
+            var screens = EFT.UI.Screens.EftScreenManager.Instance;
+            if (screens == null || !screens.CheckCurrentScreen(EFT.UI.Screens.EEftScreenType.Inventory)) yield break;
+            try { screens.CloseAllScreensForced(); }
+            catch (Exception e) { Plugin.Log.LogWarning("[siege] Closing the inventory: " + e.Message); }
+            // A frame for it to go before the raid does.
+            yield return null;
+            yield return null;
+        }
+
+        private static bool Holding()
+        {
+            try
+            {
+                var ui = EFT.UI.ItemUiContext.Instance;
+                return ui != null && Dragging?.GetValue(ui) != null;
+            }
+            catch { return false; }
         }
     }
 
@@ -210,38 +288,52 @@ namespace HideoutSiege
             Fire(SiegeIds.RouteResult, JsonConvert.SerializeObject(new SiegeResult { Victory = victory, Tier = tier, Waves = waves, Kills = kills }));
         }
 
-        // Before the game's own end-of-raid message, so whatever it reloads after that is already right. Only the host's racks came in.
+        // Before the game's own end-of-raid message, so whatever it reloads after that is already right. Only the racks of
+        // whoever's hideout it is came in; every player has a stash box.
         internal static void ReportRackGear()
         {
             var world = Comfort.Common.Singleton<GameWorld>.Instance;
-            // Whoever's hideout it is says: the host, or on a Fika headless the player it's hosting for.
-            if (world == null || !SiegeOwner.IsMe) return;
+            if (world == null || SiegeOwner.OnHeadless) return;
+            // Whose hideout it is: the host's, or on a Fika headless the player it's hosting for. Anyone else is helping.
+            bool mine = SiegeOwner.IsMe;
             var untouched = new List<string>();
             // Loot put into something from your racks that's still lying about (a bag you filled and left): it's kept too.
             var added = new List<Item>();
             int lying = 0;
-            foreach (var loot in world.LootList.OfType<EFT.Interactive.LootItem>())
-                // Still the loot's, not moved on to someone (a mannequin's loadout is taken by moving it, not picking it up).
-                if (SiegeGear.IsRackGear(loot) && loot.Item != null && ReferenceEquals(loot.Item.Owner, loot.ItemOwner))
-                {
-                    lying++;
-                    foreach (var item in loot.Item.GetAllItems())
+            if (mine)
+                foreach (var loot in world.LootList.OfType<EFT.Interactive.LootItem>())
+                    // Still the loot's, not moved on to someone (a mannequin's loadout is taken by moving it, not picking it up).
+                    if (SiegeGear.IsRackGear(loot) && loot.Item != null && ReferenceEquals(loot.Item.Owner, loot.ItemOwner))
                     {
-                        if (item.Id.ToString().StartsWith(SiegeIds.GearPrefix)) untouched.Add(item.Id);
-                        else if (item.Parent?.Container?.ParentItem is Item holder && holder.Id.ToString().StartsWith(SiegeIds.GearPrefix)) added.Add(item);
+                        lying++;
+                        foreach (var item in loot.Item.GetAllItems())
+                        {
+                            if (item.Id.ToString().StartsWith(SiegeIds.GearPrefix)) untouched.Add(item.Id);
+                            else if (item.Parent?.Container?.ParentItem is Item holder && holder.Id.ToString().StartsWith(SiegeIds.GearPrefix)) added.Add(item);
+                        }
                     }
-                }
             var deposited = new List<Item>();
-            SiegeStash.Split(untouched, added, deposited);
+            // The stash boxes are kept only if the hideout holds: overrun, the attackers have them. Said before it's
+            // over (died and left early), the server waits for the result.
+            bool held = SiegeState.Phase == SiegePhase.Won;
+            bool fell = SiegeState.Phase == SiegePhase.Lost || (!held && !SiegeDirector.Defenders().Any());
+            if (!fell) SiegeStash.Split(mine, untouched, added, deposited);
             // Held out: your own things you left lying about (a bag you filled and dropped) are yours to keep too.
-            var left = SiegeState.Phase == SiegePhase.Won ? SiegeGear.LeftLying(world.MainPlayer) : new List<Item>();
-            Plugin.Log.LogInfo($"[siege] Telling the server what's still on your racks: {lying} things ({untouched.Count} items, with what's in them); to keep, {added.Count} things you put in them, {deposited.Count} in your stash and {left.Count} of your own left lying about.");
+            var left = mine && SiegeState.Phase == SiegePhase.Won ? SiegeGear.LeftLying(world.MainPlayer) : new List<Item>();
+            if (!mine)
+            {
+                if (deposited.Count == 0) return;
+                Plugin.Log.LogInfo($"[siege] Telling the server what's in your stash box: {deposited.Count} things to keep.");
+            }
+            else Plugin.Log.LogInfo($"[siege] Telling the server what's still on your racks: {lying} things ({untouched.Count} items, with what's in them); to keep, {added.Count} things you put in them, {deposited.Count} in your stash box and {left.Count} of your own left lying about.");
             try
             {
                 var factory = Comfort.Common.Singleton<ItemFactory>.Instance;
                 var body = new
                 {
-                    Untouched = untouched,
+                    // Nothing at all from a friend helping: there's nothing of theirs on the racks to settle.
+                    Untouched = mine ? untouched : null,
+                    Pending = !held,
                     Deposited = deposited.Count > 0 ? factory.TreeToFlatItems(deposited) : new JsonType.FlatItem[0],
                     Added = added.Count > 0 ? factory.TreeToFlatItems(added) : new JsonType.FlatItem[0],
                     Left = left.Count > 0 ? factory.TreeToFlatItems(left) : new JsonType.FlatItem[0],
@@ -278,10 +370,15 @@ namespace HideoutSiege
             shownAt = -1f;
         }
 
+        private const float PollSeconds = 300f;
+
         internal static void Update()
         {
-            if (Time.realtimeSinceStartup < nextPoll || !AtMenu()) return;
-            nextPoll = Time.realtimeSinceStartup + 30f;
+            // A Fika headless sits at its menu all day with nobody to see the alert, so it never asks.
+            if (Application.isBatchMode || Time.realtimeSinceStartup < nextPoll || !AtMenu()) return;
+            // Not often: the server's said when the next one's due, and it's asked again the moment that comes (and after
+            // every raid, and when "Invade my hideout now" is switched on).
+            nextPoll = Time.realtimeSinceStartup + PollSeconds;
             Poll();
         }
 

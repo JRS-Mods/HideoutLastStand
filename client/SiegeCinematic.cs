@@ -33,9 +33,9 @@ namespace HideoutSiege
             // On another player's game it could still be going, from before the camera was called for.
             float giveUp = Time.time + GearGivesUp;
             while (!SiegeGear.Finished && Time.time < giveUp) yield return null;
-            SiegeSounds.Hush(false);
             if (!Plugin.Cinematic.Value)
             {
+                SiegeSounds.Hush(false);
                 SiegeHud.Black = 0f;
                 SiegeSounds.StartAlarm();
                 yield break;
@@ -45,7 +45,11 @@ namespace HideoutSiege
             Active = true;
             GameUiVisible(false);
             HoldPlayers(true);
+            // The game stays silent for as long as the camera's not yours: a security camera has no microphone, and what
+            // you'd hear is your own body in bed (guns being put on racks) and the attackers' feet on the stairs. The siege's
+            // own sounds (the feed cutting out, the alarm) aren't the game's, and play through it.
             yield return current.Run();
+            SiegeSounds.Hush(false);
             SiegeSounds.StartAlarm();
             HoldPlayers(false);
             GameUiVisible(true);
@@ -172,6 +176,7 @@ namespace HideoutSiege
         private void OnDestroy()
         {
             SiegeHud.Black = 0f;
+            SiegeSounds.Hush(false);
             foreach (var part in hidden) if (part != null) part.forceRenderingOff = false;
         }
 
@@ -225,7 +230,9 @@ namespace HideoutSiege
         [HarmonyPrefix]
         private static bool Prefix(ref EFT.InputSystem.InputNode.ETranslateResult __result)
         {
-            if (!SiegeCinematic.Active) return true;
+            // And once you're on your way out: Fika's already let go of your player's networking, so opening the
+            // inventory and moving things then throws partway through.
+            if (!SiegeCinematic.Active && !SiegeExit.Closing) return true;
             __result = EFT.InputSystem.InputNode.ETranslateResult.Block;
             return false;
         }

@@ -20,12 +20,14 @@ public sealed class SiegeGearData : SPTarkov.Server.Core.Models.Utils.IRequestDa
 {
     // Every copy still lying where it was put, and everything still in it.
     public List<string>? Untouched { get; set; }
-    // What's in the stash box (each thing with what's in or on it), for your real stash.
+    // What's in your stash box (each thing with what's in or on it), for your real stash.
     public List<Item>? Deposited { get; set; }
     // New things in copies still lying about (loot put in a bag from your racks), for your real stash.
     public List<Item>? Added { get; set; }
     // After holding out: your own things left lying about in the hideout (each with what's in it), for your real stash.
     public List<Item>? Left { get; set; }
+    // The siege wasn't over when this was said (the player died and left early): what's in the box is theirs only if the hideout holds.
+    public bool Pending { get; set; }
 }
 
 /// <summary>
@@ -35,7 +37,7 @@ public sealed class SiegeGearData : SPTarkov.Server.Core.Models.Utils.IRequestDa
 /// </summary>
 [Injectable(InjectionType.Singleton, TypePriority = OnLoadOrder.PostLoad + 50)]
 public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTarkov.Server.Core.Helpers.Items.ItemHelper itemHelper, ICloner cloner,
-    InventoryHelper inventoryHelper, SPTarkov.Server.Core.Services.Commerce.MailSendService mail, ISptLogger<SiegeRackGear> logger) : IOnLoad
+    InventoryHelper inventoryHelper, SPTarkov.Server.Core.Services.Commerce.MailSendService mail, SiegeStore store, ISptLogger<SiegeRackGear> logger) : IOnLoad
 {
     private const string WeaponRack = "24", SecondRack = "25", GearStands = "26";
     private const int MagazinesPerGun = 4, MostMagazines = 16;
@@ -59,115 +61,73 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
         harmony.Patch(target, postfix: new HarmonyMethod(typeof(SiegeRackGear), nameof(AfterLootGenerated)));
         var raidEnd = AccessTools.Method(typeof(LocationLifecycleService), "HandlePostRaidPmc");
         if (raidEnd != null) harmony.Patch(raidEnd, postfix: new HarmonyMethod(typeof(SiegeRackGear), nameof(AfterPmcRaid)));
-        // The box that stands in for your stash is a Developer case nobody has. It's made the stash's width and as tall as
-        // the biggest stash, so your whole stash goes in it laid out as you keep it. Now, before any game fetches the items.
+        // A stash box is a Developer case nobody has, made the size the config says: that's how much each player can put
+        // away in a siege. Now, before any game fetches the items.
         var (known, template) = itemHelper.GetItem(new MongoId(SiegeIds.StashBoxTemplate));
         var grid = known ? template?.Properties?.Grids?.FirstOrDefault()?.Properties : null;
-        if (grid is null) logger.Warning("Hideout Last Stand: couldn't make the siege's stash box stash-sized: only what's near the top of your stash comes in.");
+        var (columns, rows) = store.StashBoxSize;
+        if (grid is null) logger.Warning("Hideout Last Stand: couldn't set the size of the siege's stash boxes: they're a Developer case's size.");
         else
         {
-            grid.CellsH = BoxWidth;
-            grid.CellsV = BoxRows;
+            grid.CellsH = columns;
+            grid.CellsV = rows;
         }
         return Task.CompletedTask;
     }
 
-    private const int BoxWidth = 10, BoxRows = 100;
-
     private static void AfterLootGenerated(MongoId sessionId, string name, bool generateLoot, LocationBase __result)
     {
         if (!generateLoot || !string.Equals(name, SiegeIds.LocationId, StringComparison.OrdinalIgnoreCase)) return;
-        // On a Fika headless it's the racks and stash of the player it's hosting for.
+        // On a Fika headless it's the racks of the player it's hosting for.
         sessionId = new MongoId(SiegeOwners.Of(sessionId.ToString()));
-        // The racks first: the spare magazines they take from the stash aren't in the stash box as well (or you'd take both).
-        HashSet<string> onRacks = [];
-        try { onRacks = instance?.AddTo(sessionId, __result) ?? []; }
+        SiegeOwners.Began(sessionId.ToString());
+        lock (held) held.Remove(sessionId.ToString());
+        try { instance?.AddTo(sessionId, __result); }
         catch (Exception e) { instance?.Warn("Hideout Last Stand: couldn't bring your rack gear in: " + e); }
-        try { instance?.AddStashBox(sessionId, __result, onRacks); }
-        catch (Exception e) { instance?.Warn("Hideout Last Stand: couldn't put your stash in the siege: " + e); }
+        try { instance?.AddStashBoxes(__result); }
+        catch (Exception e) { instance?.Warn("Hideout Last Stand: couldn't put the stash boxes in the siege: " + e); }
+        instance?.Opened(sessionId.ToString());
     }
 
-    // Sieges whose stash box hasn't been emptied into the real stash yet: it's done once, whichever report comes first.
+    // Players whose stash box hasn't been emptied into their real stash yet: it's done once, whichever report comes first.
     private static readonly HashSet<string> open = new();
 
-    // The box for the siege's Stash station, by the beds to start with: the game moves it into the station. In it, a copy of
-    // everything in your stash where you keep it, like the racks: take something out and the real one's gone from your
-    // stash at the end (it's on you, or lost with you); leave it, or put it back, and it stays.
-    private void AddStashBox(MongoId session, LocationBase location, HashSet<string> onRacks)
+    /// <summary>This player's in a siege: what they put away in it is to go to their stash at the end.</summary>
+    public void Opened(string session)
     {
-        var box = new SptLootItem { Id = new MongoId(SiegeIds.StashBox), Template = new MongoId(SiegeIds.StashBoxTemplate) };
-        var inBox = new List<SptLootItem> { box };
-        var inventory = profiles.GetPmcProfile(session)?.Inventory;
-        if (inventory?.Items is not null && inventory.Stash is not null)
+        lock (open) open.Add(session);
+    }
+
+    // The boxes for the siege's Stash station, by the beds to start with: each game moves them into the station. Empty, one
+    // for each player who might be there: nobody knows yet who's coming, so each player's game asks which is theirs.
+    private void AddStashBoxes(LocationBase location)
+    {
+        var boxes = new List<SpawnpointTemplate>();
+        for (int number = 0; number < SiegeIds.StashBoxes; number++)
         {
-            var children = inventory.Items.Where(i => i.ParentId is not null).ToLookup(i => i.ParentId!);
-            if (!copies.TryGetValue(session.ToString(), out var map)) copies[session.ToString()] = map = new Dictionary<string, MongoId>();
-            int copied = 0, outside = 0;
-            string firstOut = "";
-            foreach (var top in children[inventory.Stash.Value.ToString()].Where(i => i.SlotId == "hideout"))
+            string id = SiegeIds.StashBoxId(number);
+            boxes.Add(new SpawnpointTemplate
             {
-                if (onRacks.Contains(top.Id.ToString())) continue;
-                if (!FitsTheBox(top, inventory.Items)) { if (outside++ == 0) firstOut = $" (the first at {top.Location} [{top.Location?.GetType().Name ?? "none"}])"; continue; }
-                inBox.AddRange(CopyTree(top, children, map, 0, SiegeIds.StashBox, "main"));
-                copied++;
-            }
-            logger.Info($"Hideout Last Stand: your stash is in the siege: {copied} things{(outside > 0 ? $", and {outside} too far down it to fit the box (they stay put){firstOut}" : "")}.");
+                Id = "hideoutsiege stash " + number,
+                IsContainer = false,
+                UseGravity = false,
+                RandomRotation = false,
+                Position = DropPoint,
+                Rotation = new SPTarkov.Server.Core.Models.Eft.Common.Vector3(0f, 0f, 0f),
+                IsGroupPosition = false,
+                GroupPositions = [],
+                IsAlwaysSpawn = true,
+                Root = id,
+                Items = [new SptLootItem { Id = new MongoId(id), Template = new MongoId(SiegeIds.StashBoxTemplate) }],
+            });
         }
-        location.Loot = (location.Loot ?? []).Append(new SpawnpointTemplate
-        {
-            Id = "hideoutsiege stash",
-            IsContainer = false,
-            UseGravity = false,
-            RandomRotation = false,
-            Position = DropPoint,
-            Rotation = new SPTarkov.Server.Core.Models.Eft.Common.Vector3(0f, 0f, 0f),
-            IsGroupPosition = false,
-            GroupPositions = [],
-            IsAlwaysSpawn = true,
-            Root = SiegeIds.StashBox,
-            Items = inBox,
-        }).ToList();
-        lock (open) open.Add(session.ToString());
+        location.Loot = (location.Loot ?? []).Concat(boxes).ToList();
     }
 
-    // Where it is in your stash, it has to be inside the box: anything further down than the box goes stays where it is.
-    private bool FitsTheBox(Item top, IEnumerable<Item> items)
-    {
-        if (!Place(top.Location, out int x, out int y, out bool vertical)) return false;
-        var (w, h) = inventoryHelper.GetItemSize(top.Template, top.Id, items);
-        if (vertical) (w, h) = (h, w);
-        return x + w <= BoxWidth && y + h <= BoxRows;
-    }
-
-    // A place in a grid, as the profile has it: read in as a location, or still as its JSON.
-    private static bool Place(object? location, out int x, out int y, out bool vertical)
-    {
-        x = y = 0;
-        vertical = false;
-        switch (location)
-        {
-            case ItemLocation at when at.X is not null && at.Y is not null:
-                x = at.X.Value;
-                y = at.Y.Value;
-                vertical = at.R == ItemRotation.Vertical;
-                return true;
-            case System.Text.Json.JsonElement json when json.ValueKind == System.Text.Json.JsonValueKind.Object
-                && json.TryGetProperty("x", out var jx) && json.TryGetProperty("y", out var jy):
-                x = jx.GetInt32();
-                y = jy.GetInt32();
-                if (json.TryGetProperty("r", out var r))
-                    vertical = r.ValueKind == System.Text.Json.JsonValueKind.Number ? r.GetInt32() == 1 : string.Equals(r.GetString(), "Vertical", StringComparison.OrdinalIgnoreCase);
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    // Returns what came from the stash for the racks (spare magazines), so the stash box leaves those out.
-    private HashSet<string> AddTo(MongoId session, LocationBase location)
+    private void AddTo(MongoId session, LocationBase location)
     {
         var inventory = profiles.GetPmcProfile(session)?.Inventory;
-        if (inventory?.Items is null || inventory.HideoutAreaStashes is null) return [];
+        if (inventory?.Items is null || inventory.HideoutAreaStashes is null) return;
         var children = inventory.Items.Where(i => i.ParentId is not null).ToLookup(i => i.ParentId!);
         var roots = new List<Item>();
         var mannequins = new Dictionary<Item, int>();
@@ -190,8 +150,7 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
         foreach (var root in roots) loot.Add(Copy(root, children, map, mannequins.GetValueOrDefault(root)));
         location.Loot = (location.Loot ?? []).Concat(loot).ToList();
         copies[session.ToString()] = map;
-        logger.Info($"Hideout Last Stand: {loot.Count} things brought in from your racks, gear stands and stash.");
-        return roots.Select(r => r.Id.ToString()).ToHashSet();
+        logger.Info($"Hideout Last Stand: {loot.Count} things brought in from your racks and gear stands, with spare magazines from your stash.");
     }
 
     // Fullest first, from the top level of the stash: anything inside a case or a rig stays where you put it.
@@ -219,7 +178,7 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
 
     private SpawnpointTemplate Copy(Item root, ILookup<string, Item> children, Dictionary<string, MongoId> map, int mannequin)
     {
-        var tree = CopyTree(root, children, map, mannequin, null, null);
+        var tree = CopyTree(root, children, map, mannequin);
         return new SpawnpointTemplate
         {
             Id = "hideoutsiege " + tree[0].Id,
@@ -236,9 +195,8 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
         };
     }
 
-    // A thing and everything in or on it, with copies' ids (each noted against the real one's). The root goes loose
-    // (parent null), or into a container at the same place it had in yours (the stash box).
-    private List<SptLootItem> CopyTree(Item root, ILookup<string, Item> children, Dictionary<string, MongoId> map, int mannequin, string? into, string? slot)
+    // A thing and everything in or on it, with copies' ids (each noted against the real one's). The root goes loose.
+    private List<SptLootItem> CopyTree(Item root, ILookup<string, Item> children, Dictionary<string, MongoId> map, int mannequin)
     {
         var tree = new List<SptLootItem>();
         var newIds = new Dictionary<string, MongoId>();
@@ -254,9 +212,9 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
                 Id = id,
                 Template = item.Template,
                 Upd = cloner.Clone(item.Upd),
-                ParentId = isRoot ? into : newIds[item.ParentId!].ToString(),
-                SlotId = isRoot ? slot : item.SlotId,
-                Location = isRoot && into is null ? null : item.Location,
+                ParentId = isRoot ? null : newIds[item.ParentId!].ToString(),
+                SlotId = isRoot ? null : item.SlotId,
+                Location = isRoot ? null : item.Location,
             });
             foreach (var child in children[item.Id.ToString()]) Visit(child);
         }
@@ -274,19 +232,21 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
         var pmc = profiles.GetPmcProfile(session);
         var inventory = pmc?.Inventory;
         bool changed = false;
-        if (!copies.Remove(session.ToString(), out var map))
+        // A friend helping has no racks here: their game says only what's in their stash box.
+        if (data.Untouched is null) { }
+        else if (!copies.Remove(session.ToString(), out var map))
             logger.Info("Hideout Last Stand: told what's still on your racks, but nothing was brought in for this raid (or it's been settled already).");
         else
         {
             var untouched = new HashSet<string>(data.Untouched ?? []);
             var gone = map.Where(pair => !untouched.Contains(pair.Key)).Select(pair => pair.Value.ToString()).ToHashSet();
             if (gone.Count == 0 || inventory?.Items is null)
-                logger.Info($"Hideout Last Stand: everything from your racks and stash is still there ({untouched.Count} untouched).");
+                logger.Info($"Hideout Last Stand: everything from your racks is still there ({untouched.Count} untouched).");
             else
             {
                 int before = inventory.Items.Count;
                 inventory.Items.RemoveAll(item => gone.Contains(item.Id.ToString()));
-                logger.Info($"Hideout Last Stand: {before - inventory.Items.Count} items taken from your racks and stash in the siege.");
+                logger.Info($"Hideout Last Stand: {before - inventory.Items.Count} items taken from your racks in the siege.");
                 changed = true;
             }
         }
@@ -297,10 +257,58 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
             // What you put in the stash box, loot left in a bag from your racks, and (after holding out) your own things left
             // lying about. The game writes each thing at the top of a list without its parent: those are what go in the stash.
             var trees = new List<List<Item>>();
-            foreach (var list in new[] { data.Deposited, data.Added, data.Left }) trees.AddRange(Tops(list));
+            foreach (var list in new[] { data.Added, data.Left }) trees.AddRange(Tops(list));
+            // The stash box is only theirs if the hideout holds. Their game says so itself when it's over; said before
+            // then, it waits for the result (or the result's already in).
+            var box = Tops(data.Deposited);
+            if (box.Count > 0)
+            {
+                string owner = SiegeOwners.SiegeOf(session.ToString());
+                bool? result = data.Pending ? SiegeOwners.Result(owner) : true;
+                if (result == true) trees.AddRange(box);
+                else if (result == false) logger.Info($"Hideout Last Stand: the hideout fell, so the {box.Count} things in {session}'s stash box are gone.");
+                else
+                {
+                    lock (held)
+                    {
+                        if (!held.TryGetValue(owner, out var waiting)) held[owner] = waiting = [];
+                        waiting.Add((session.ToString(), box));
+                    }
+                    logger.Info($"Hideout Last Stand: {session} left before the siege was over: the {box.Count} things in their stash box wait to see if the hideout holds.");
+                }
+            }
             if (trees.Count > 0) changed |= IntoStash(session, pmc, trees);
         }
         if (changed) _ = saves.SaveProfileAsync(session);
+    }
+
+    // Stash boxes of players who left a siege before it was over, by whose siege it is.
+    private static readonly Dictionary<string, List<(string Session, List<List<Item>> Box)>> held = new();
+
+    /// <summary>The siege is over. Whoever left early gets what was in their stash box by message if the hideout held, and nothing if it fell.</summary>
+    public void Settle(string owner, bool victory)
+    {
+        List<(string Session, List<List<Item>> Box)>? waiting;
+        lock (held)
+        {
+            if (!held.Remove(owner, out waiting)) return;
+        }
+        foreach (var (session, box) in waiting)
+        {
+            if (!victory) { logger.Info($"Hideout Last Stand: the hideout fell, so the {box.Count} things in {session}'s stash box are gone."); continue; }
+            var parcel = new MongoId();
+            var items = new List<Item>();
+            foreach (var tree in box.Where(tree => tree.All(item => Known(item.Template))))
+            {
+                var fresh = Renumbered(tree, parcel.ToString());
+                fresh[0].SlotId = "main";
+                fresh[0].Location = null;
+                items.AddRange(fresh);
+            }
+            if (items.Count == 0) continue;
+            mail.SendSystemMessageToPlayer(new MongoId(session), "The hideout held after you went down. Here's what you'd put in your stash box.", items, 604800);
+            logger.Info($"Hideout Last Stand: the hideout held: {session} gets the {box.Count} things from their stash box by message.");
+        }
     }
 
     private const string LooseTop = "hideoutsiege loose";
@@ -325,8 +333,8 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
     {
         var trees = new List<List<Item>>();
         if (flat is null || flat.Count == 0) return trees;
-        // The stash box itself never goes in: only what was in it.
-        flat = flat.Where(i => i.Id.ToString() != SiegeIds.StashBox).ToList();
+        // A stash box itself never goes in: only what was in it.
+        flat = flat.Where(i => !SiegeIds.IsStashBox(i.Id.ToString())).ToList();
         var byParent = flat.Where(i => i.ParentId is not null).ToLookup(i => i.ParentId!);
         foreach (var top in flat.Where(i => i.ParentId is not null && isTop(i.ParentId)))
         {
@@ -454,10 +462,11 @@ public sealed class SiegeRackGear(ProfileHelper profiles, SaveServer saves, SPTa
     private void DropTheBox(MongoId session, PmcData? pmc)
     {
         var items = pmc?.Inventory?.Items;
-        if (items is null || !items.Any(i => i.Id.ToString() == SiegeIds.StashBox)) return;
+        if (items is null || !items.Any(i => SiegeIds.IsStashBox(i.Id.ToString()))) return;
         var byParent = items.Where(i => i.ParentId is not null).ToLookup(i => i.ParentId!);
-        var inside = Trees(items.Where(i => i.ParentId == SiegeIds.StashBox).SelectMany(top => Descendants(top, byParent)).ToList(), parent => parent == SiegeIds.StashBox);
-        var all = new HashSet<string>(inside.SelectMany(t => t).Select(i => i.Id.ToString())) { SiegeIds.StashBox };
+        var inside = Trees(items.Where(i => i.ParentId is not null && SiegeIds.IsStashBox(i.ParentId)).SelectMany(top => Descendants(top, byParent)).ToList(), SiegeIds.IsStashBox);
+        var all = new HashSet<string>(inside.SelectMany(t => t).Select(i => i.Id.ToString()));
+        all.UnionWith(items.Select(i => i.Id.ToString()).Where(SiegeIds.IsStashBox));
         items.RemoveAll(i => all.Contains(i.Id.ToString()));
         logger.Info("Hideout Last Stand: you carried the stash box out: its things go into your stash, and the box stays behind.");
         if (inside.Count > 0) IntoStash(session, pmc!, inside);

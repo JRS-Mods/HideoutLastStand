@@ -72,14 +72,14 @@ public sealed class SiegeLocation(LocationTable locations, LocaleTable locales, 
                 text[$"{b.IdField} Description"] = "Your hideout is under attack. Hold it.";
                 return text;
             });
-        // The box that stands in for your stash in the siege, in every language: nobody has one of these otherwise.
+        // Each player's stash box in the siege, in every language: nobody has one of these otherwise.
         foreach (var table in locales.Global.Values)
             table.AddTransformer(text =>
             {
                 if (text == null) return text;
                 text[$"{SiegeIds.StashBoxTemplate} Name"] = "Stash";
                 text[$"{SiegeIds.StashBoxTemplate} ShortName"] = "Stash";
-                text[$"{SiegeIds.StashBoxTemplate} Description"] = "Your stash. Take what you need: what you take out and lose is gone from it. Whatever you put in here is in your real stash afterwards.";
+                text[$"{SiegeIds.StashBoxTemplate} Description"] = "Your stash box for this siege. Whatever you put in here is in your real stash afterwards, if the hideout holds.";
                 return text;
             });
         string key = SiegeIds.LocationId.ToLowerInvariant();

@@ -48,6 +48,11 @@ namespace HideoutSiege
     {
         internal readonly int Scavs, Raiders, BlackDivision;
         internal WaveSpec(int scavs, int raiders, int blackDivision) { Scavs = scavs; Raiders = raiders; BlackDivision = blackDivision; }
+
+        /// <summary>The same wave for a bigger group: never smaller, and nobody turns up who wasn't coming.</summary>
+        internal WaveSpec Times(float by) => new WaveSpec(More(Scavs, by), More(Raiders, by), More(BlackDivision, by));
+
+        private static int More(int count, float by) => count == 0 ? 0 : Mathf.Max(count, Mathf.RoundToInt(count * by));
         internal int Total => Scavs + Raiders + BlackDivision;
     }
 
@@ -147,6 +152,15 @@ namespace HideoutSiege
             int tier = DefenceRating.Tier(DefenceRating.Percent(HideoutCopy.Levels()));
             SiegeState.Tier = tier;
             waves = DefenceRating.Waves(tier);
+            // Counted now, with everyone in: on the loading screen nobody knows yet who's joining.
+            int defenders = Defenders().Count();
+            float more = MoreFor(defenders);
+            atOnce = AtOnceFor(defenders);
+            if (more > 1f)
+            {
+                waves = waves.Select(w => w.Times(more)).ToArray();
+                Plugin.Log.LogInfo($"[siege] {defenders} defenders: waves are {more:0.##} times the size, {atOnce} attackers at once.");
+            }
             SiegeState.TotalWaves = waves.Length;
             Plugin.Log.LogInfo($"[siege] Tier {tier}: {string.Join(", ", waves.Select(w => w.Scavs + "+" + w.Raiders + "+" + w.BlackDivision))}. Black Division bots: {(HaveBlackDivision() ? "mod" : "stand-ins")}.");
 
@@ -154,7 +168,7 @@ namespace HideoutSiege
             // Everything slow happens now, while the screen's still black: your gear, then the whole first wave.
             yield return SiegeCinematic.GetReady();
             var firstOrder = OrderFor(waves[0]);
-            int firstStaged = Mathf.Min(firstOrder.Count, Plugin.MaxAlive.Value);
+            int firstStaged = Mathf.Min(firstOrder.Count, atOnce);
             float giveUp = Time.time + StageGivesUp;
             yield return Stage(firstOrder, giveUp, .3f);
             yield return new WaitUntil(() => staged >= firstStaged || Time.time >= giveUp);
@@ -283,6 +297,21 @@ namespace HideoutSiege
             return index % 2 == 0 ? WildSpawnType.pmcBot : WildSpawnType.exUsec;
         }
 
+        // The hideout only has room for so many, however many of you there are: they wait past the gate, which has about this many places.
+        private const int MostAtOnceForAGroup = 10;
+        private int atOnce = Plugin.MaxAlive.Value;
+
+        /// <summary>How much bigger each wave is for this many defenders: the setting's share more for each one after the first.</summary>
+        internal static float MoreFor(int defenders) => 1f + Mathf.Max(0, defenders - 1) * Plugin.MorePerPlayer.Value / 100f;
+
+        // One more at a time for each extra defender, while waves grow for them. Never under what's been set.
+        private static int AtOnceFor(int defenders)
+        {
+            int set = Plugin.MaxAlive.Value;
+            if (defenders <= 1 || Plugin.MorePerPlayer.Value <= 0) return set;
+            return Mathf.Max(set, Mathf.Min(set + defenders - 1, MostAtOnceForAGroup));
+        }
+
         private static BotDifficulty DifficultyFor(WildSpawnType role, int tier)
         {
             return role == WildSpawnType.assault && tier < 3 ? BotDifficulty.normal : BotDifficulty.hard;
@@ -308,7 +337,7 @@ namespace HideoutSiege
         {
             staging = true;
             staged = 0;
-            for (int i = Mathf.Min(order.Count, Plugin.MaxAlive.Value); i > 0 && Time.time < until && !finished; i--)
+            for (int i = Mathf.Min(order.Count, atOnce); i > 0 && Time.time < until && !finished; i--)
             {
                 SpawnOne(order[order.Count - 1]);
                 order.RemoveAt(order.Count - 1);
@@ -383,7 +412,7 @@ namespace HideoutSiege
                 secondSpots.AddRange(SiegeEntries.TunnelHolding);
             }
             else if (EmergencySpots(secondSpots)) second = Second.Emergency;
-            if (second != Second.None) secondQuota = Mathf.Max(1, Mathf.Min(coming, Plugin.MaxAlive.Value) / SecondEntryShare);
+            if (second != Second.None) secondQuota = Mathf.Max(1, Mathf.Min(coming, atOnce) / SecondEntryShare);
         }
 
         // Out of sight behind the Emergency Wall's door, on the side further from everyone defending.
@@ -671,7 +700,7 @@ namespace HideoutSiege
                 attackers.RemoveAll(b => b == null || b.IsDead);
                 arriving.RemoveAll(sent => Time.time - sent > 45f);
                 int alive = attackers.Count + spawning + arriving.Count;
-                while (queued > 0 && alive < Plugin.MaxAlive.Value)
+                while (queued > 0 && alive < atOnce)
                 {
                     SpawnOne(order[--queued]);
                     alive++;
@@ -1342,12 +1371,13 @@ namespace HideoutSiege
         {
             finished = true;
             SiegeState.Remaining = 0;
+            // Before the others hear it's won: they leave when this runs out, and the last break's has long since.
+            SiegeState.CountdownUntil = Time.time + Plugin.LootTime.Value;
             SetPhase(SiegePhase.Won);
             SiegeSounds.Play("victory");
             SiegeSounds.StopAlarm();
             SiegeState.Announce("HIDEOUT HELD", 8f);
             SiegeState.Notify("Loot them: what you put in your stash or a bag from your racks is kept", 10f);
-            SiegeState.CountdownUntil = Time.time + Plugin.LootTime.Value;
             Net.Broadcast();
             SiegeBackend.Report(true, SiegeState.Tier, SiegeState.Wave, SiegeState.Kills);
             StartCoroutine(LeaveAfterLooting());

@@ -40,6 +40,8 @@ namespace HideoutSiege
             var source = host.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.spatialBlend = 0f;
+            // Heard while the game's hushed (the black screen, the cinematic): that silences the game, not the siege.
+            source.ignoreListenerVolume = true;
             if (Singleton<BetterAudio>.Instantiated) source.outputAudioMixerGroup = Singleton<BetterAudio>.Instance.VeryStandartMixerGroup;
             return source;
         }
@@ -155,7 +157,7 @@ namespace HideoutSiege
             if (PowerOut) return;
             if (instance == null) instance = new GameObject(OwnLight + " lights").AddComponent<SiegeLights>();
             foreach (var l in FindObjectsOfType<Light>())
-                if (l != null && !l.name.StartsWith(OwnLight)) instance.lights.Add((l, l.enabled, l.intensity));
+                if (l != null && !l.name.StartsWith(OwnLight) && !Carried(l)) instance.lights.Add((l, l.enabled, l.intensity));
             HideoutCopy.TellLampsAboutPower(false);
             foreach (var lamp in FindObjectsOfType<EFT.Interactive.LampController>())
                 try
@@ -170,6 +172,12 @@ namespace HideoutSiege
             SiegeSounds.Play("powerdown");
             Plugin.Log.LogInfo($"[siege] Generator off: {instance.lights.Count} lights out.");
         }
+
+        // Not on the hideout's power: a light on a gun or a helmet, whoever has it or wherever it's lying. Cutting the power
+        // was putting out the flashlight on your own gun, if it happened to be on at that moment.
+        private static bool Carried(Light l) =>
+            l.GetComponentInParent<Player>() != null || l.GetComponentInParent<TacticalComboVisualController>() != null
+            || l.GetComponentInParent<WeaponPrefab>() != null || l.GetComponentInParent<EFT.Interactive.LootItem>() != null;
 
         internal static void PowerBack()
         {

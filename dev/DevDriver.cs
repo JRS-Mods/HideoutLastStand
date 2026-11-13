@@ -545,7 +545,15 @@ namespace HideoutSiege.Dev
                     }
                 }
                 LogBanners();
-                if (Environment.GetEnvironmentVariable("SIEGE_STASH") != null && !IsCoopClient) StashSteps(me);
+                if (Environment.GetEnvironmentVariable("SIEGE_STASH") != null) StashSteps(me);
+                // SIEGE_ASK: ask for the first thing of another player's on the racks. SIEGE_ANSWER=yes|no: answer whoever asks.
+                if (Environment.GetEnvironmentVariable("SIEGE_ASK") != null) AskSteps(me);
+                string answer = Environment.GetEnvironmentVariable("SIEGE_ANSWER");
+                if (answer != null && SiegeAsk.Current != null)
+                {
+                    Logger.LogInfo($"[test] Asked by {SiegeAsk.Current.Name} for {SiegeAsk.Current.What}: answering {answer}.");
+                    SiegeAsk.Respond(answer == "yes");
+                }
                 // "second": hold out in the first siege, go down in the last.
                 bool dieThisOne = Environment.GetEnvironmentVariable("SIEGE_DIE") != "second" || loops <= 1;
                 if (SiegeState.Phase == SiegePhase.Fighting && !died && !godAfterSecond && dieThisOne && Environment.GetEnvironmentVariable("SIEGE_DIE") != null)
@@ -626,6 +634,36 @@ namespace HideoutSiege.Dev
             Logger.LogInfo(sb.ToString());
         }
 
+        private int askStep, askTries;
+        private float askAt;
+        private EFT.Interactive.LootItem askFor;
+
+        // What looking at another player's gear offers, asking for it, and what it offers once they've answered.
+        private void AskSteps(Player me)
+        {
+            if (SiegeState.Phase == SiegePhase.None || SiegeCinematic.Active || askStep >= 9 || Time.time < askAt) return;
+            askAt = Time.time + 1.5f;
+            if (askFor == null)
+                askFor = System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.OfType<EFT.Interactive.LootItem>(Singleton<GameWorld>.Instance.LootList),
+                    l => SiegeAsk.OwnerOf(l) is string whose && whose != me.ProfileId && ReferenceEquals(l.Item.Owner, l.ItemOwner));
+            if (askFor == null)
+            {
+                if (++askTries > 8) { Logger.LogInfo("[test] Nothing of another player's on the racks to ask for."); askStep = 9; }
+                return;
+            }
+            var state = InteractionContextHelper.GetAvailableActions(me.GetComponent<GamePlayerOwner>(), askFor);
+            string offered = state?.Actions == null ? "nothing (" + (state?.Error ?? "no reason") + ")" : string.Join(", ", System.Linq.Enumerable.Select(state.Actions, a => a.Name));
+            Logger.LogInfo($"[test] {askFor.Name.Localized()} ({askFor.ItemId}), {SiegeAsk.OwnerOf(askFor)}'s: offers {offered}.");
+            if (askStep == 0)
+            {
+                var ask = state?.Actions == null ? null : System.Linq.Enumerable.FirstOrDefault(state.Actions, a => a.Name.StartsWith("Ask"));
+                if (ask == null) { askStep = 9; return; }
+                ask.Action();
+                askStep = 1;
+            }
+            else if (++askStep > 5) askStep = 9;
+        }
+
         private int stashStep;
         private float stashAt;
         private SiegePhase stashPhase;
@@ -657,13 +695,7 @@ namespace HideoutSiege.Dev
                     return;
                 }
                 case 1:
-                    // Something of yours out of the stash first (in the break before the first wave), then something in.
-                    if (stashPhase == SiegePhase.Prep) StartCoroutine(TakeOut(me, StashBox()));
-                    stashStep = 10;
-                    stashAt = Time.time + 2f;
-                    return;
-                case 10:
-                    StartCoroutine(PutAway(me, StashBox(), "the stash"));
+                    StartCoroutine(PutAway(me, SiegeStash.Mine, "the stash"));
                     stashStep = 2;
                     stashAt = Time.time + 2f;
                     return;
@@ -694,9 +726,6 @@ namespace HideoutSiege.Dev
             }
         }
 
-        private static EFT.Interactive.LootItem StashBox() =>
-            System.Linq.Enumerable.FirstOrDefault(System.Linq.Enumerable.OfType<EFT.Interactive.LootItem>(Singleton<GameWorld>.Instance.LootList), l => l.ItemId == SiegeIds.StashBox);
-
         // Something from your pockets (or else a magazine off the racks) into it, as a quick move would.
         private System.Collections.IEnumerator PutAway(Player me, EFT.Interactive.LootItem into, string what)
         {
@@ -719,29 +748,6 @@ namespace HideoutSiege.Dev
             float giveUp = Time.time + 2f;
             while (Time.time < giveUp && !Inside(item, container)) yield return null;
             Logger.LogInfo($"[test] Put {name} ({item.Id}) in {what}: {(Inside(item, container) ? "it's in" : "it isn't")}.");
-        }
-
-        // The first thing of yours in the stash that you've room for, on to you.
-        private System.Collections.IEnumerator TakeOut(Player me, EFT.Interactive.LootItem from)
-        {
-            if (from == null || !(from.Item is EFT.InventoryLogic.CompoundItem box)) { Logger.LogInfo("[test] No stash to take from."); yield break; }
-            var controller = me.InventoryController;
-            int yours = 0;
-            foreach (var grid in box.Grids)
-                foreach (var item in System.Linq.Enumerable.ToList(grid.Items))
-                {
-                    if (!item.Id.ToString().StartsWith(SiegeIds.GearPrefix)) continue;
-                    yours++;
-                    var move = EFT.InventoryLogic.ItemManipulator.QuickFindAppropriatePlace(item, controller, new[] { controller.Inventory.Equipment }, EFT.InventoryLogic.ItemManipulator.EMoveItemOrder.PickUp, true);
-                    if (move.Failed || !controller.CanExecute(move.Value)) continue;
-                    string name = item.ShortName.Localized();
-                    controller.RunNetworkTransaction(move.Value, null);
-                    float giveUp = Time.time + 2f;
-                    while (Time.time < giveUp && Inside(item, box)) yield return null;
-                    Logger.LogInfo($"[test] The stash had {yours}+ things of yours in it; took {name} ({item.Id}) out: {(Inside(item, box) ? "it's still in" : "it's on me")}.");
-                    yield break;
-                }
-            Logger.LogInfo($"[test] The stash had {yours} things of yours in it, and none I had room for.");
         }
 
         // Something from your pockets, or else a magazine off the racks.

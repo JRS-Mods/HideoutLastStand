@@ -7,7 +7,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\Tushonka - Hideout S
 bash dev/cycle.sh "Menu is up|siege map failed" 200 | grep -E "MARKER|FAILED|error|TIMED|EXITED" | cut -c1-200
 rm -f /f/SPT/BepInEx/plugins/HideoutSiege.Dev/shots_client/*
 echo "--- starting client"
-powershell.exe -NoProfile -Command "\$env:SIEGE_ROLE='client'; \$env:SIEGE_GOD='1'; Remove-Item Env:SIEGE_AUTOKILL -ErrorAction SilentlyContinue; Remove-Item Env:SIEGE_WAIT_PEERS -ErrorAction SilentlyContinue; \$cfg='{\\\"BackendUrl\\\":\\\"https://127.0.0.1:6969\\\",\\\"Version\\\":\\\"live\\\",\\\"MatchingVersion\\\":\\\"live\\\"}'; Start-Process 'F:\SPT_CoopTest\EscapeFromTarkov.exe' -WorkingDirectory 'F:\SPT_CoopTest' -ArgumentList \"-token=bbbbbbbbbbbbbbbbbbbb5678 -config=\$cfg -screen-fullscreen 0 -screen-width 1280 -screen-height 720\""
+powershell.exe -NoProfile -Command "\$env:SIEGE_ROLE='client'; \$env:SIEGE_GOD='1'; \$env:SIEGE_NOGO=\$env:SIEGE_CLIENT_NOGO; \$env:SIEGE_DIE=\$env:SIEGE_CLIENT_DIE; \$env:SIEGE_ASK=\$env:SIEGE_CLIENT_ASK; Remove-Item Env:SIEGE_AUTOKILL -ErrorAction SilentlyContinue; Remove-Item Env:SIEGE_WAIT_PEERS -ErrorAction SilentlyContinue; \$cfg='{\\\"BackendUrl\\\":\\\"https://127.0.0.1:6969\\\",\\\"Version\\\":\\\"live\\\",\\\"MatchingVersion\\\":\\\"live\\\"}'; Start-Process 'F:\SPT_CoopTest\EscapeFromTarkov.exe' -WorkingDirectory 'F:\SPT_CoopTest' -ArgumentList \"-token=${SIEGE_CLIENT_TOKEN:-bbbbbbbbbbbbbbbbbbbb5678} -config=\$cfg -screen-fullscreen 0 -screen-width 1280 -screen-height 720\""
 start=$SECONDS
 L=/f/SPT/BepInEx/LogOutput.log
 while [ $((SECONDS-start)) -lt 540 ]; do

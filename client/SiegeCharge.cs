@@ -31,6 +31,10 @@ namespace HideoutSiege
         private bool lit;
         private Light glowLight;
         private Renderer lampShape, glowShape;
+        // Its timer, heard from close by and not far beyond that: through the door it's on, if you put your ear near it.
+        private const float TickHeardTo = 6f, TickFullWithin = .8f, TickVolume = .3f;
+        private static AudioClip tick;
+        private AudioSource ticking;
 
         // Reading it all takes a moment, so this happens while the screen's black. If anything's wrong the charge is a plain box and the siege goes on.
         internal static void Load()
@@ -249,6 +253,7 @@ namespace HideoutSiege
                 if (t < 1f) return;
                 state = State.Armed;
             }
+            if (ticking == null) Tick();
 
             float left = secondsLeft();
             if (left > SolidFrom && Time.time >= nextBlink)
@@ -266,6 +271,43 @@ namespace HideoutSiege
                 glowLight.intensity = Mathf.Lerp(2.5f, 6f, closer);
                 glowLight.range = Mathf.Lerp(2.2f, 3.5f, closer);
             }
+        }
+
+        private void Tick()
+        {
+            ticking = gameObject.AddComponent<AudioSource>();
+            ticking.clip = TickClip();
+            ticking.loop = true;
+            ticking.playOnAwake = false;
+            ticking.spatialBlend = 1f;
+            ticking.dopplerLevel = 0f;
+            ticking.rolloffMode = AudioRolloffMode.Linear;
+            ticking.minDistance = TickFullWithin;
+            ticking.maxDistance = TickHeardTo;
+            ticking.volume = TickVolume * Plugin.Volume.Value;
+            if (Comfort.Common.Singleton<BetterAudio>.Instantiated) ticking.outputAudioMixerGroup = Comfort.Common.Singleton<BetterAudio>.Instance.VeryStandartMixerGroup;
+            ticking.Play();
+        }
+
+        // A second of clockwork, made here: a sharp tick, and a duller tock half a second after it.
+        private static AudioClip TickClip()
+        {
+            if (tick != null) return tick;
+            const int rate = 44100;
+            var samples = new float[rate];
+            void Click(int from, float pitch, float loud)
+            {
+                for (int i = 0; i < rate / 40 && from + i < samples.Length; i++)
+                {
+                    float t = i / (float)rate, fade = Mathf.Exp(-t * 260f);
+                    samples[from + i] += loud * fade * (Mathf.Sin(2f * Mathf.PI * pitch * t) * .7f + Mathf.Sin(2f * Mathf.PI * pitch * 2.7f * t) * .3f);
+                }
+            }
+            Click(0, 2400f, .9f);
+            Click(rate / 2, 1700f, .6f);
+            tick = AudioClip.Create("Hideout Siege tick", samples.Length, 1, rate, false);
+            tick.SetData(samples, 0);
+            return tick;
         }
 
         private void ShowLit(bool on)

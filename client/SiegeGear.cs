@@ -111,6 +111,8 @@ namespace HideoutSiege
             }
             placing = null;
             world.OnThrowItem -= Place;
+            // In co-op it's still this player's: anyone else asks before taking it.
+            SiegeAsk.Announce(me.ProfileId, LaidOut.Select(item => item.Id).ToArray());
             PutUpRackGear(world, controller, racks);
             me.Rotation = facing;
             putAway = true;

@@ -77,6 +77,7 @@ namespace HideoutSiege
             SiegeMannequins.Reset();
             SiegeMoves.Reset();
             SiegeStash.Reset();
+            SiegeAsk.Reset();
         }
     }
 

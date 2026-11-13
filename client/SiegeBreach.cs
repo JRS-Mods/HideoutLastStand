@@ -413,6 +413,10 @@ namespace HideoutSiege
             catch (Exception e) { Plugin.Log.LogWarning("[siege] " + e.Message); }
             SiegeSounds.Play("breach");
             Plugin.Instance.StartCoroutine(SiegeLights.Flash(at));
+            // Dust, debris and smoke, thrown the way the blast goes: through what the charge is on.
+            bool wall = SiegeEntries.IsTunnelCharge(at);
+            Vector3 toward = wall ? -SiegeEntries.TunnelOut : door != null ? Centre(door) - at : defence != null ? defence.position - at : Vector3.zero;
+            SiegeBlastLook.Burst(at, toward, wall, wall ? SiegeEntries.WallLook : null);
             // Before the door or barricade goes: whoever's behind it is shielded by it.
             Wound(at);
             SiegeEntries.Blasted(at);
@@ -456,8 +460,9 @@ namespace HideoutSiege
             foreach (var r in door.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
         }
 
-        // A blast hurts whoever's near it on its own side: badly up close, nothing past WoundRange. Each game sees to its own
-        // player, the host to the attackers. Not the head: a charge going off beside you shouldn't be a coin toss.
+        // A blast hurts whoever of you is near it on its own side: badly up close, nothing past WoundRange. Each game sees to
+        // its own player. Not the head: a charge going off beside you shouldn't be a coin toss. Not the attackers: they set
+        // these and know to stand clear, but the ones coming up behind didn't, and waves were losing men to their own charges.
         private const float WoundRange = 4.5f, WoundFull = 1f;
         private static readonly (EBodyPart Part, float Damage)[] Wounds =
         {
@@ -471,9 +476,7 @@ namespace HideoutSiege
             int mask = EFTHardSettings.Instance.MOVEMENT_MASK;
             foreach (var player in world.AllAlivePlayersList.ToList())
             {
-                if (player == null || !(player.IsYourPlayer || (player.IsAI && !Net.IsClient))) continue;
-                // Those still waiting to come in stand clear of their own charges (the Emergency Wall's is close to them).
-                if (player.IsAI && player.AIData?.BotOwner != null && SiegeDirector.Waiting.Contains(player.AIData.BotOwner)) continue;
+                if (player == null || !player.IsYourPlayer) continue;
                 var health = player.ActiveHealthController;
                 if (health == null || !health.IsAlive) continue;
                 Vector3 chest = player.Position + Vector3.up * 1.1f;
@@ -585,6 +588,7 @@ namespace HideoutSiege
         {
             DrawEveryone();
             SiegeGear.Update();
+            SiegeStash.Update();
             if (sealedUp && Time.time >= nextDoorCheck) { nextDoorCheck = Time.time + 1f; RefreshDoors(); }
         }
 

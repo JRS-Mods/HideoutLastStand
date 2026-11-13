@@ -96,6 +96,28 @@ namespace HideoutSiege.Fika
         }
     }
 
+    public struct SiegeAskPacket : INetSerializable
+    {
+        // Whose gear is whose (0), a player asking for another's (1), or the answer (2): see SiegeAsk.
+        public int Kind;
+        public string Player, Other;
+        public string[] Items;
+
+        public readonly void Serialize(NetDataWriter writer)
+        {
+            writer.Put(Kind); writer.Put(Player ?? ""); writer.Put(Other ?? "");
+            writer.Put(Items?.Length ?? 0);
+            foreach (string item in Items ?? new string[0]) writer.Put(item ?? "");
+        }
+
+        public void Deserialize(NetDataReader reader)
+        {
+            Kind = reader.GetInt(); Player = reader.GetString(); Other = reader.GetString();
+            Items = new string[reader.GetInt()];
+            for (int i = 0; i < Items.Length; i++) Items[i] = reader.GetString();
+        }
+    }
+
     public struct SiegeCarryPacket : INetSerializable
     {
         public string ProfileId;
@@ -233,6 +255,7 @@ namespace HideoutSiege.Fika
             }));
             network.RegisterPacket<SiegeSandbagPacket, NetPeer>((p, from) => Safely(() => Net.ReceivedSandbags(new Vector3(p.X, p.Y, p.Z), p.Yaw)));
             network.RegisterPacket<SiegeTurretPacket, NetPeer>((p, from) => Safely(() => { if (!host) SiegeTurret.Heard(p.From, p.Aim, p.Shots); }));
+            network.RegisterPacket<SiegeAskPacket, NetPeer>((p, from) => Safely(() => Net.ReceivedAsk(p.Kind, p.Player, p.Other, p.Items)));
             network.RegisterPacket<SiegeLayoutPacket, NetPeer>((p, from) => Safely(() => { if (!host) Net.ReceivedLayout(p.Types, p.Levels, p.SurfaceTypes, p.SurfaceIds, p.CopyNames, p.CopySnapshots, p.OwnerId); }));
         }
 
@@ -244,6 +267,7 @@ namespace HideoutSiege.Fika
             network.UnregisterPacket<SiegeLayoutPacket>();
             network.UnregisterPacket<SiegeSandbagPacket>();
             network.UnregisterPacket<SiegeTurretPacket>();
+            network.UnregisterPacket<SiegeAskPacket>();
             network.UnregisterPacket<SiegeDoorPacket>();
             network.UnregisterPacket<SiegeCarryPacket>();
             network.UnregisterPacket<SiegeGunPacket>();
@@ -281,6 +305,11 @@ namespace HideoutSiege.Fika
                 network.SendDataToPeer(ref state, DeliveryMethod.ReliableOrdered, from);
                 var generator = new SiegeGeneratorPacket { Off = SiegeLights.PowerOut, Cut = SiegeGenerator.Cut };
                 network.SendDataToPeer(ref generator, DeliveryMethod.ReliableOrdered, from);
+                foreach (var (player, items) in SiegeAsk.OwnedSoFar())
+                {
+                    var owned = new SiegeAskPacket { Kind = SiegeAsk.Owned, Player = player, Other = "", Items = items };
+                    network.SendDataToPeer(ref owned, DeliveryMethod.ReliableOrdered, from);
+                }
                 foreach (var (at, yaw) in SiegeSandbags.Placed)
                 {
                     var bags = new SiegeSandbagPacket { X = at.x, Y = at.y, Z = at.z, Yaw = yaw };
@@ -339,6 +368,17 @@ namespace HideoutSiege.Fika
         public void SendSandbags(Vector3 at, float yaw)
         {
             var packet = new SiegeSandbagPacket { X = at.x, Y = at.y, Z = at.z, Yaw = yaw };
+            if (!host)
+            {
+                network.SendData(ref packet, DeliveryMethod.ReliableOrdered);
+                return;
+            }
+            foreach (NetPeer peer in peers) network.SendDataToPeer(ref packet, DeliveryMethod.ReliableOrdered, peer);
+        }
+
+        public void SendAsk(int kind, string player, string other, string[] items)
+        {
+            var packet = new SiegeAskPacket { Kind = kind, Player = player, Other = other, Items = items };
             if (!host)
             {
                 network.SendData(ref packet, DeliveryMethod.ReliableOrdered);

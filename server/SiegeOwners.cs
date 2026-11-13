@@ -62,6 +62,55 @@ public sealed class SiegeOwners(ProfileHelper profiles, ISptLogger<SiegeOwners> 
     /// <summary>Whether this is a headless that's hosted a raid for someone.</summary>
     public static bool IsHeadless(string session) => hosting.ContainsKey(session);
 
+    // Sieges under way: whose hideout to the players in it, in the order their games said so. A player's place is their stash box.
+    private static readonly Dictionary<string, List<string>> players = new();
+    // Players helping in someone else's siege, and whose.
+    private static readonly ConcurrentDictionary<string, string> guests = new();
+
+    /// <summary>A siege of this player's hideout is being set up: nobody's in it yet.</summary>
+    public static void Began(string owner)
+    {
+        lock (players) players[owner] = [];
+        guests.TryRemove(owner, out _);
+        results.TryRemove(owner, out _);
+    }
+
+    // How each siege under way went, once any game in it has said: whether the hideout held.
+    private static readonly ConcurrentDictionary<string, bool> results = new();
+
+    /// <summary>Whose siege this player is in: their own, or the one they're helping in.</summary>
+    public static string SiegeOf(string session) => guests.TryGetValue(session, out var owner) ? owner : session;
+
+    /// <summary>A game says how the siege went. True the first time it's said for this siege.</summary>
+    public static bool Finished(string owner, bool held) => results.TryAdd(owner, held);
+
+    /// <summary>Whether this player's hideout held, if anyone's said yet.</summary>
+    public static bool? Result(string owner) => results.TryGetValue(owner, out bool held) ? held : null;
+
+    /// <summary>A player's game says whose siege it's in. Answers with the number of their stash box, or -1 if there are none left.</summary>
+    public static int Join(string session, string? owner)
+    {
+        if (string.IsNullOrEmpty(owner)) owner = session;
+        if (owner == session) guests.TryRemove(session, out _);
+        else guests[session] = owner;
+        int place;
+        lock (players)
+        {
+            if (!players.TryGetValue(owner, out var inIt)) players[owner] = inIt = [];
+            place = inIt.IndexOf(session);
+            if (place < 0)
+            {
+                inIt.Add(session);
+                place = inIt.Count - 1;
+            }
+        }
+        instance?.Note($"Hideout Last Stand: {session} is in {(owner == session ? "their own siege" : owner + "'s siege, helping")}: stash box {place + 1}.");
+        return place < SiegeIds.StashBoxes ? place : -1;
+    }
+
+    /// <summary>Whether this player's last siege was someone else's: the hideout's losses aren't theirs.</summary>
+    public static bool IsGuest(string session) => guests.ContainsKey(session);
+
     public void Keep(string session, SiegeLayoutData layout)
     {
         layouts[session] = (DateTime.UtcNow, layout);

@@ -19,6 +19,7 @@ namespace HideoutSiege
         void SendGenerator(bool off, bool cut);
         void SendSandbags(UnityEngine.Vector3 at, float yaw);
         void SendTurret(UnityEngine.Vector3 from, UnityEngine.Vector3 aim, int shots);
+        void SendAsk(int kind, string player, string other, string[] items);
     }
 
     /// <summary>Loads the Fika link only where Fika is installed, the same way Experimental Ordnance does.</summary>
@@ -171,6 +172,20 @@ namespace HideoutSiege
         {
             SiegeSandbags.Place(at, yaw);
             if (IsHost) SendSandbags(at, yaw);
+        }
+
+        // Whose gear is whose, a player asking for another's, or the answer: to everyone, by way of the host.
+        internal static void SendAsk(int kind, string player, string other, string[] items)
+        {
+            if (link == null || !link.Online) return;
+            try { link.SendAsk(kind, player, other, items); }
+            catch (Exception e) { Plugin.Log.LogWarning("[siege] " + e.Message); }
+        }
+
+        internal static void ReceivedAsk(int kind, string player, string other, string[] items)
+        {
+            SiegeAsk.Received(kind, player, other, items);
+            if (IsHost) SendAsk(kind, player, other, items);
         }
 
         // The host's turret fired a burst: the others hear it and see the flash.

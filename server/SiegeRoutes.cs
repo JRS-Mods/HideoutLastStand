@@ -19,6 +19,9 @@ public sealed class SiegeConfig
     public double MaxHoursBetween { get; set; } = 8;
     public double HoursAfterDefeat { get; set; } = 2;
     public bool InvadedOnFirstRun { get; set; } = true;
+    // Each player's stash box in the siege: how much they can put away for afterwards.
+    public int StashBoxColumns { get; set; } = 10;
+    public int StashBoxRows { get; set; } = 6;
 }
 
 public sealed class SiegeProfileState
@@ -72,6 +75,12 @@ public record SiegeResultData : IRequestData
 
 public record SiegeEmptyData : IRequestData;
 
+public record SiegeJoinData : IRequestData
+{
+    // Whose hideout the siege is in, as the player's game knows it.
+    public string? Owner { get; init; }
+}
+
 /// <summary>
 /// Keeps each profile's invasion schedule in the mod's own folder (never in the profile). Holding out pays in what you loot
 /// and put away in the siege, not by message.
@@ -97,11 +106,18 @@ public sealed class SiegeStore(RandomUtil random, ISptLogger<SiegeStore> logger)
             try
             {
                 if (File.Exists(path)) config = JsonSerializer.Deserialize<SiegeConfig>(File.ReadAllText(path));
-                else File.WriteAllText(path, JsonSerializer.Serialize(new SiegeConfig(), Json));
+                // Written back either way, so settings added since the file was made are in it to change.
+                File.WriteAllText(path, JsonSerializer.Serialize(config ?? new SiegeConfig(), Json));
             }
             catch (Exception e) { logger.Warning("Hideout Last Stand: couldn't read config.json, using defaults: " + e.Message); }
             return config ??= new SiegeConfig();
         }
+    }
+
+    /// <summary>How big each player's stash box is in the siege: cells across and down.</summary>
+    public (int Columns, int Rows) StashBoxSize
+    {
+        get { lock (gate) return (Math.Clamp(Config.StashBoxColumns, 1, 10), Math.Clamp(Config.StashBoxRows, 1, 100)); }
     }
 
     private SiegeProfileState Get(string id)
@@ -208,6 +224,12 @@ public sealed class SiegeRouter(JsonUtil json, SiegeStore store, SiegeRackGear g
         gear.Finish(new MongoId(SiegeOwners.Of(session.ToString())), data);
         return new ValueTask<string>("{}");
     }),
+    new RouteAction<SiegeJoinData>(SiegeIds.RouteJoin, (_, data, session, _, _) =>
+    {
+        int box = SiegeOwners.Join(session.ToString(), data.Owner);
+        gear.Opened(session.ToString());
+        return new ValueTask<string>(JsonSerializer.Serialize(new { Box = box }));
+    }),
     new RouteAction<SiegeEmptyData>(SiegeIds.RouteState, (_, _, session, _, _) => new ValueTask<string>(JsonSerializer.Serialize(store.Status(session.ToString())))),
     new RouteAction<SiegeEmptyData>(SiegeIds.RouteDefeatSeen, (_, _, session, _, _) =>
     {
@@ -221,8 +243,17 @@ public sealed class SiegeRouter(JsonUtil json, SiegeStore store, SiegeRackGear g
     }),
     new RouteAction<SiegeResultData>(SiegeIds.RouteResult, (_, data, session, _, _) =>
     {
-        // A headless's own result isn't anyone's: the players it hosted for each say how it went for them.
-        if (!SiegeOwners.IsHeadless(session.ToString())) store.Finish(session, data);
+        // The result is the hideout's owner's, whichever game says it first (they may have died and gone): never a
+        // headless's that hosted it, and a friend who came to help says it for the owner, not themselves.
+        if (!SiegeOwners.IsHeadless(session.ToString()))
+        {
+            string owner = SiegeOwners.SiegeOf(session.ToString());
+            if (SiegeOwners.Finished(owner, data.Victory))
+            {
+                store.Finish(new MongoId(owner), data);
+                gear.Settle(owner, data.Victory);
+            }
+        }
         return new ValueTask<string>("{}");
     }),
     new RouteAction<SiegeLayoutData>(SiegeIds.RouteLayout, (_, data, session, _, _) =>

@@ -23,7 +23,8 @@ if ($Remove) {
 
 New-Item -ItemType Directory -Force $dst | Out-Null
 foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
-    if ($item.Name -in 'Logs', 'BepInEx', 'EscapeFromTarkov_Data', 'SPT_Runtime') { continue }
+    # SPT_Runtime is linked too: the game finds the server mods' bundles through it.
+    if ($item.Name -in 'Logs', 'BepInEx', 'EscapeFromTarkov_Data') { continue }
     if ($item.Name -like '_*' -or $item.Extension -in '.log', '.lnk') { continue }
     $target = Join-Path $dst $item.Name
     if ($item.PSIsContainer) { cmd /c mklink /J "$target" "$($item.FullName)" | Out-Null }

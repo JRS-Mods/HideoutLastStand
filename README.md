@@ -26,7 +26,7 @@ For SPT 4.1. Works alone or with Fika.
 2. **The security camera.** A few seconds: a scav walks down the stairwell to your front door with his gun on his back and the charge in his hand, sets it on the door and walks back up. The feed cuts out and you wake up by the bed. Space skips it. Nobody can be hurt while it plays.
 3. **Get ready.** You have 60 seconds. Your guns and spare magazines are on the weapon racks, and your armour, rig, backpack and helmet are at the gear rack, with everything still in them. Just pick them up: nothing needs searching. Guns are ready to fire, with your fullest spare magazine in and a round chambered. Meds and injectors are in your pockets where they fit, so their quick slots stay set. Haven't built a weapon rack yet? You keep your guns on you. No gear stand? You keep your armour, rig, backpack and helmet on. So you can defend from your first day. The door is locked until the charge goes off, and it beeps for the last 10 seconds.
 4. **The breach.** The door blows, and so does the gate of the cultist room at the top of the stairs: the attackers have been waiting past it, out of sight, and they come through the cultist room, down the stairwell and through the front door. They know you're there. Each wave ends when all its attackers are dead, then you get 25 seconds to heal, reload and loot.
-5. **The end.** Hold through the last wave and you have a minute to loot (and put what you want in your stash: see [What it costs and pays](#what-it-costs-and-pays)) before you leave as **Survived**. Press F10 to leave sooner. If everyone dies, the raid ends as a normal death.
+5. **The end.** Hold through the last wave and you have a minute to loot (and put what you want in your stash box: see [What it costs and pays](#what-it-costs-and-pays)) before you leave as **Survived**. Press F10 to leave sooner. If everyone dies, the raid ends as a normal death.
 
 The door is whichever one your Security level has: wood, grille or steel. An unbuilt Security station gets the wood one. You can make it hold out longer: see [Upgrading the front door](#upgrading-the-front-door).
 
@@ -36,7 +36,7 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 
 ![The generator goes off, the hideout goes dark, and night vision comes on](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/02_lights_out.gif)
 
-**Blasts hurt.** Within 16 metres you're concussed for a while, and within 12 metres with a clear view you're blinded for a few seconds. Within about 4 metres on the charge's side you're wounded too, badly up close (attackers as well as you); the door or barricade it's on shields whoever's behind it. Don't stand and watch the door.
+**Blasts hurt.** Within 16 metres you're concussed for a while, and within 12 metres with a clear view you're blinded for a few seconds. Within about 4 metres on the charge's side you're wounded too, badly up close (the attackers aren't hurt by their own charges); the door or barricade it's on shields whoever's behind it. Don't stand and watch the door.
 
 ![Their charge glows red on the door beside you, then blows](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/06_blown_up.gif)
 
@@ -70,13 +70,13 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 
 ## Losing
 
-If you die in the siege, you lose what you carried, as in any raid, and more: while you were down they went through your stash and took the most valuable things (not money, and not cases with things in them), they wrecked part of your hideout on the way out, and you come round badly hurt (and hungry and thirsty), so you'll want to heal up before your next raid. In the end-of-raid screens, after your experience and before the one to heal up, **Hideout Overrun** shows what they took (and what it was worth), what they wrecked, the state you came round in and what your Security and Medstation did for you; there's a message with it in your mail too.
+If you die in the siege, you lose what you carried, as in any raid, and more: while you were down they went through your stash, your weapon racks and your mannequins and took the most valuable things, wherever they were (not money, and not cases with things in them), they wrecked part of your hideout on the way out, and you come round badly hurt (and hungry and thirsty), so you'll want to heal up before your next raid. In the end-of-raid screens, after your experience and before the one to heal up, **Hideout Overrun** shows what they took (and what it was worth), what they wrecked, the state you came round in and what your Security and Medstation did for you; there's a message with it in your mail too.
 
 ![Hideout Overrun: what they took from your stash, what they wrecked, and the state you came round in](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/07_overrun_report.png)
 
 The better defended the hideout they broke into, the more they take; a better Security station keeps more of it safe.
 
-| Things taken from your stash | Security 0 | 1 | 2 | 3 |
+| Things taken from your stash, racks and mannequins | Security 0 | 1 | 2 | 3 |
 |---|---|---|---|---|
 | Defences under 25% | 3 | 2 | 2 | 2 |
 | Defences 25-49% | 4 | 3 | 3 | 2 |
@@ -106,9 +106,13 @@ It's a real raid, so **you bring your own gear and lose it if you die**. Anythin
 
 **Holding the hideout pays in what they brought.** There's no reward by message: you keep what you loot from the attackers. After the last wave you have a minute to strip them, and there are two ways to keep more than you can carry:
 
-- **Your stash:** walk up to the Stash station and **Open stash**. Whatever you put in it is in your real stash afterwards (in co-op, the host's). It works between waves too, and what's in it is kept even if you go down later. If your stash is full, what doesn't fit comes by message instead. It holds your real stash, laid out as you keep it: take out whatever you need (a gun, ammo, meds). Anything you take out is gone from your stash at the end: you have it if you get out with it, and lose it if you die with it. Put it back, or drop it somewhere in the hideout, and it stays yours.
+- **Your stash box:** walk up to the Stash station and **Open stash**. It's an empty box, 10 by 6 unless you change it (see [Settings](#settings)), and whatever you put in it is in your real stash afterwards. It works between waves too. **It's only kept if the hideout holds:** if you go down but the others hold out, what's in your box is still yours, and if everyone dies the attackers have every box. If your stash is full, what doesn't fit comes by message instead. You can't get at your real stash from the siege: you fight with what you brought and what's on your racks. In co-op every player has a box of their own, and what's in it goes to their own stash.
 - **Bags from your racks:** fill a backpack or rig from your gear stands and drop it anywhere in the hideout, then fill the next: what you put in them goes into your stash afterwards, and the bags stay on your stands as they were.
 - **Your own gear:** after holding out, anything of your own that you left lying in the hideout (the gear you came in with, laid out on the racks, and whatever you've stuffed in it) goes into your stash too. Lose, and it's lost, as in any raid.
+
+**In co-op it's the hideout of whoever started the defence.** If they die, they pay for it: what they carried, and what's taken, wrecked and done to them (see [Losing](#losing)). A friend who dies helping loses what they carried in, as in any raid, and comes round as badly hurt as the owner would (less with a better Medstation of their own). Their own stash and hideout aren't touched, and the result doesn't count towards their own invasions. The bags from the racks and the gear left lying are only kept for the player whose hideout it is.
+
+**Ask before you take.** What's on the racks and mannequins belongs to someone: the hideout's gear to whoever's hideout it is, and what each player came in with to that player. Look at something of another player's and you get **Ask ... for this** in place of Take. They see who's asking and for what, and press F7 to allow or F8 to decline (see [Settings](#settings)); no answer in 20 seconds and you can ask again. Once its owner is dead, anyone can take it.
 
 ## Threat levels
 
@@ -121,6 +125,8 @@ Your defence rating comes from Security, Emergency Wall, Intelligence Center, Sh
 | 50-74% | Scavs, then Black Division | 4 | 14 |
 | 75%+ | Scavs, then Black Division | 5 | 19 |
 
+**In co-op the waves are bigger.** Each wave is 50% bigger for every player after the first, counted as the siege starts: two of you face waves one and a half times the size, four of you two and a half times (19 attackers become 48 at the top level). One more attacker comes at a time for each extra player too, up to 10. The host's setting decides (see [Settings](#settings)); 0 turns it off. The extra attackers aren't known about on the loading screen, so they load as each wave gathers during the break.
+
 Every siege goes the same way: scavs for the first two waves, then Black Division from the third. The banner says when they first turn up.
 
 **Black Division** is TacticalToaster's mod (its assault troops and raiders). Without it, Raiders and Rogues come instead. Black Division needs MoreBots (with its patcher in `BepInEx/patchers`), SAIN 4.5, WTT CommonLib and WTT ContentBackport; if any is missing it doesn't load, and you get Raiders.
@@ -132,8 +138,9 @@ What you need is in the table at the top ([What you need](#what-you-need)). In m
 - **SAIN:** attackers run on SAIN if it's installed. SAIN's bots hold cover while they can't see you, so the siege takes over an attacker that hasn't seen any of you for a few seconds and walks it toward the nearest of you, blowing doors on the way; once one of you is in sight, SAIN fights. This uses BigBrain, which SAIN needs anyway.
 - **Bot mods with gear of their own:** a type whose bots come without weapons (its gear comes from a mod that isn't installed) is noticed on the loading screen, and others are sent in its place.
 - **ORBIT:** ORBIT's bot brain stays out of the siege, because the hideout has none of the zones it plans routes across. Your other raids aren't affected.
-- **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter. A Fika headless can host it too: start the defence from the alert, then pick the headless. It's your hideout they attack, with your racks and your stash (only you can open it), and the result is yours.
+- **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter. A Fika headless can host it too: start the defence from the alert, then pick the headless. It's your hideout they attack, with your racks, and the result is yours. Everyone has their own stash box.
 - **Tushonka Territories:** its faction spawns and kill counter stay out of the siege, which has its own attackers and isn't one of its territories. Your other raids aren't affected.
+- **HollywoodFX and HollywoodGraphics:** both run in the siege as in any raid: impacts, muzzle effects, blood, explosions and the bloom. The hideout's camera has no bloom effect of its own, so the siege gives it one for them.
 - **Hideout Extensions:** the rooms you've built are in the siege, with their doors and lamps, and your areas stand where you moved them. Attackers can follow you into the rooms, and you wake up wherever your Rest Space is. Needs Hideout Extensions 1.3 or later.
 - **Hideout Interiors:** the things you've moved, given to other areas or hidden are as you left them, and your decorations are there too, and so are your Defences. Required: 0.2.0 or later.
 
@@ -151,8 +158,10 @@ Press F12 (BepInEx Configuration Manager) and look under "Tushonka: Hideout Last
 | Seconds to prepare | 60 | From waking up to the door blowing. |
 | Seconds between waves | 25 | Time to heal, reload and loot. |
 | Attackers at once | 7 | The rest wait their turn. |
+| Bigger waves per extra player (%) | 50 | In co-op, how much bigger each wave is for every player after the first. 0 turns it off. The host's setting counts. |
 | Seconds to loot after winning | 60 | You leave when this runs out. |
 | Leave key | F10 | Leave early after winning. |
+| Allow key / Decline key | F7 / F8 | In co-op, your answer when another player asks to take your gear. |
 | Invade my hideout now | Off | Turn on at the menu to get the alert straight away. |
 
 How often invasions happen is set in `SPT_Runtime\user\mods\HideoutSiege.Server\config.json`, which is created the first time the server runs:
@@ -162,6 +171,7 @@ How often invasions happen is set in `SPT_Runtime\user\mods\HideoutSiege.Server\
 | MinHoursBetween / MaxHoursBetween | 3 / 8 | Real hours between invasions after you win. |
 | HoursAfterDefeat | 2 | Real hours before they come back if you lose. |
 | InvadedOnFirstRun | true | A profile's first check starts invaded. |
+| StashBoxColumns / StashBoxRows | 10 / 6 | The size of each player's stash box in the siege: how much they can put away. Restart the server after changing it. |
 
 ## What isn't copied
 
