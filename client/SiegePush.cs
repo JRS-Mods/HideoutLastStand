@@ -24,7 +24,7 @@ namespace HideoutSiege
 
         private sealed class Track
         {
-            public float LastSeen = -100f, NextLook, StillSince = -1f, NextNote, NextRescue, CutUntil;
+            public float LastSeen = -100f, NextLook, StillSince = -1f, NextNote, NextRescue, NextHop, CutUntil;
             // Seeing you; going for you (not a rally point); and, from its last walk toward you, cut off from you.
             public bool Seeing, ToYou, Cut;
             public Vector3 WasAt, NextCorner;
@@ -215,6 +215,28 @@ namespace HideoutSiege
                     return;
                 }
             }
+            // A way through, and still not a step taken (three stood on one spot by the cultist gate ran on it for minutes,
+            // and were only moved once nobody was looking at the door): walked along its route by hand, a pace at a time,
+            // until its legs take over. A different length each, so those stood in one another come apart.
+            if (status == UnityEngine.AI.NavMeshPathStatus.PathComplete && Time.time - track.StillSince >= HopAfter && Time.time >= track.NextHop && route.corners.Length > 1)
+            {
+                track.NextHop = Time.time + 1f;
+                float pace = 1.1f + Mathf.Abs(bot.Id) % 3 * .4f;
+                foreach (float reach in new[] { pace, .8f, .5f })
+                {
+                    Vector3 to = Along(route.corners, reach);
+                    if ((to - bot.Position).sqrMagnitude < .3f * .3f || !SiegeMoves.Clear(bot.Position, to)) continue;
+                    SiegeMoves.Put(bot, to);
+                    // Still counted as stood still: only steps of its own end this.
+                    track.WasAt = to;
+                    if (Time.time >= nextHopNote)
+                    {
+                        nextHopNote = Time.time + 10f;
+                        Plugin.Log.LogInfo($"[siege] A {bot.Profile.Info.Settings.Role} at {bot.Position:F1} has a way toward {target:F1} and isn't taking it: walking him along it.");
+                    }
+                    break;
+                }
+            }
             if (Time.time - track.StillSince < 8f || Time.time < track.NextNote) return;
             track.NextNote = Time.time + 30f;
             var mover = bot.Mover;
@@ -229,6 +251,21 @@ namespace HideoutSiege
             }
             catch (Exception e) { body = ", " + e.Message; }
             Plugin.Log.LogInfo($"[siege] A {bot.Profile.Info.Settings.Role} at {bot.Position:F1} isn't getting anywhere toward {target:F1}: route {status}, {(orders.ContainsKey(bot) ? "on a job" : "looking for you")}, {legs}{body}{InTheWay(bot)}{(LegsRanPatch.Last.TryGetValue(bot, out var legsRan) ? $". Legs last stepped {Time.time - legsRan.Ran:F1} s ago, last skipped {Time.time - legsRan.Skipped:F1} s ago" : ". Legs never stepped")}.");
+        }
+
+        private const float HopAfter = 5f;
+        private static float nextHopNote;
+
+        // The place this far along a route.
+        private static Vector3 Along(Vector3[] corners, float distance)
+        {
+            for (int i = 1; i < corners.Length; i++)
+            {
+                float leg = Vector3.Distance(corners[i - 1], corners[i]);
+                if (leg > .001f && distance <= leg) return Vector3.Lerp(corners[i - 1], corners[i], distance / leg);
+                distance -= leg;
+            }
+            return corners[corners.Length - 1];
         }
 
         // What a stalled bot is up against on its way to its next corner: anything solid at all, named, so a piece of the

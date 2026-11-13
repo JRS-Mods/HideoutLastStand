@@ -166,7 +166,13 @@ namespace HideoutSiege
                 foreach (var room in built.OrderBy(r => r.Id))
                 {
                     // A room the attackers can't walk to from the rest (its only way in a passage they can't use): no tunnel.
-                    if (!SiegeMap.Reaches(Rect.MinMaxRect(room.X0 + .3f, room.Z0 + .3f, room.X1 - .3f, room.Z1 - .3f), room.Floor)) { No("a room they can't walk to"); continue; }
+                    if (!SiegeMap.Reaches(Rect.MinMaxRect(room.X0 + .3f, room.Z0 + .3f, room.X1 - .3f, room.Z1 - .3f), room.Floor))
+                    {
+                        No("a room they can't walk to");
+                        try { Plugin.Log.LogInfo(SiegeMap.WhyNot(Rect.MinMaxRect(room.X0 + .3f, room.Z0 + .3f, room.X1 - .3f, room.Z1 - .3f), room.Floor, room.Name)); }
+                        catch (Exception e) { Plugin.Log.LogWarning("[map] Couldn't say why not: " + e.Message); }
+                        continue;
+                    }
                     foreach (var (length, clearance) in TunnelClearances.SelectMany(c => TunnelLengths.Select(l => (l, c))))
                     {
                         var here = new List<(Room room, Vector3 hole, Vector3 outward, Rect floor, float score)>();

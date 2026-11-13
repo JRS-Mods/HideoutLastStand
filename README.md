@@ -13,7 +13,7 @@ For SPT 4.1. Works alone or with Fika.
 | **Fika** | Optional | Co-op: the host runs the siege and everyone defends the host's hideout. Everyone needs the same version of this mod. A Fika headless can host it too: it's your hideout they attack. |
 | **[Hideout Extensions](https://github.com/JRS-Mods/HideoutExtensions)** 1.3+ | Optional | Only needed if you want them to breach through other walls: with its rooms built, they tunnel up to one and blow through its wall. Without it, their second way in is your Emergency Wall door. Your built rooms are in the siege too. |
 | **SAIN** 4.5 (with BigBrain) | Optional | Smarter attackers. The siege steers them towards you when SAIN would have them sit in cover. |
-| **Black Division** | Optional | The attackers from wave 3 on. Without it, Raiders and Rogues come instead. |
+| **Black Division** | Optional | One of the last waves you can get, from 50% defences. Without it, Raiders and Rogues come in their place. |
 | ↳ MoreBots (with its patcher), WTT CommonLib, WTT ContentBackport, SAIN | Needed by Black Division | Black Division won't load without all of these, and you get Raiders and Rogues. |
 | WTT Armory | Works alongside | Tested with it installed. Black Division has loadouts that use it. |
 | ORBIT | Works alongside | Its bot brain stays out of the siege. Your other raids aren't affected. |
@@ -32,7 +32,7 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
 
 ![The charge goes off, BREACH, and the first wave comes through the front door](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/03_breach.gif)
 
-**The dark.** Black Division cut the power a few seconds before they come in ("THEY'VE CUT THE POWER"): every light goes out for everyone, and the mounted gun stops minding the door by itself (you can still work it). It stays cut for the rest of the raid: the generator won't switch back on. Before that, with a generator built, you can switch the power off yourself (walk up to it and use it) and back on whenever you like, and the dark is worth it against scavs: they've nothing but the light on their gun, if they have one, and can't see past 20 metres by it. A scav without one is all but blind. Black Division (and Raiders and Rogues standing in for them) come with night vision (on their helmet's mount, or a head-strap set if they've no helmet), down while it's dark. You'll want a flashlight or night vision of your own.
+**The dark.** When the last wave is Black Division, they cut the power a few seconds before they come in ("THEY'VE CUT THE POWER"): every light goes out for everyone, and the mounted gun stops minding the door by itself (you can still work it). It stays cut for the rest of the raid: the generator won't switch back on. Before that, with a generator built, you can switch the power off yourself (walk up to it and use it) and back on whenever you like, and the dark is worth it against scavs: they've nothing but the light on their gun, if they have one, and can't see past 20 metres by it. A scav without one is all but blind. Black Division (and Raiders and Rogues standing in for them) come with night vision (on their helmet's mount, or a head-strap set if they've no helmet), down while it's dark. You'll want a flashlight or night vision of your own.
 
 ![The generator goes off, the hideout goes dark, and night vision comes on](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/02_lights_out.gif)
 
@@ -60,7 +60,7 @@ The door is whichever one your Security level has: wood, grille or steel. An unb
   | Barbed wire | 4 | Stops nothing, but anyone in it can't run, slows to a crawl and gets their legs cut as they push through. Attackers don't go round it, so put it where you want them held up in your sights. It catches you too. |
   | Mounted gun | 1 | See below. |
 - **Mounted gun:** at Security level 2 or higher, a heavy machine gun, if you've put one in: Mounted gun is in Hideout Interiors' decor panel, Defences tab, and the one you place is where it stands, facing the way you turned it. Without one placed, there's no gun. While nobody's on it and the power's on, it minds the door by itself: it slowly swings to the nearest attacker it can see within 24 metres, takes a second to settle, and fires short, loose bursts: 30 rounds a wave, topped up every break, and never with one of you in the way. It holds them up rather than clearing the room; someone on it does far better. Walk up and use **Operate** to take it over.
-- **Second way in:** from wave 2, about half of each wave comes another way. With Hideout Extensions' rooms built, they've dug a tunnel up to the wall of one of them, a room picked at random each invasion (one well away from the front door, where there's a choice): as that wave starts, the wall's blown and they come through it. The hole's ragged and scorched, and through it there's a dug tunnel with a bank of earth across it; they wait round the far side of the bank, out of your sight. You can't go into the tunnel, or past the cultist room's gate where the rest wait: walking in stops you where you were. The tunnel is never dug right alongside another room. Otherwise, if your Emergency Wall has its door, they blow that from the side you aren't on. Either way there's a warning and a short fuse, and there's never more than the one: the front door and this.
+- **Second way in:** from wave 2, about half of each wave comes another way. With Hideout Extensions' rooms built, they've dug a tunnel up to the wall of one of them, a room picked at random each invasion (one well away from the front door, where there's a choice): as that wave starts, the wall's blown and they come through it. The hole's ragged and scorched, and through it there's a dug tunnel with a bank of earth across it; they wait round the far side of the bank, out of your sight. You can't go into the tunnel, or past the cultist room's gate where the rest wait: walking in stops you where you were. The tunnel is never dug right alongside another room. Otherwise, if your Emergency Wall still has its door shut with nothing but that door leading past it, they blow it from the far side. In a hideout built out past the wall, where the far side is one of your own rooms, or if you could see them waiting there, nobody comes that way and the whole wave comes by the front door. Either way there's a warning and a short fuse, and there's never more than the one: the front door and this.
 
   ![THEY'RE COMING THROUGH A WALL: the second way in](https://raw.githubusercontent.com/JRS-Mods/HideoutLastStand/main/screenshots/gifs/04_through_the_wall.gif)
 
@@ -120,14 +120,34 @@ Your defence rating comes from Security, Emergency Wall, Intelligence Center, Sh
 
 | Defences | Who comes | Waves | Attackers in all |
 |---|---|---|---|
-| Under 25% | Scavs, then Black Division | 3 | 7 |
-| 25-49% | Scavs, then Black Division | 3 | 9 |
-| 50-74% | Scavs, then Black Division | 4 | 14 |
-| 75%+ | Scavs, then Black Division | 5 | 19 |
+| Under 25% | 2 scavs · 2 scavs, 1 Raider · last wave | 3 | 4 + the last wave |
+| 25-49% | 2 scavs, 1 Raider · 1 scav, 1 Raider, 1 PMC · last wave | 3 | 6 + the last wave |
+| 50-74% | 2 scavs, 1 Raider · 2 Raiders, 2 PMCs · 2 Smugglers, 1 Rogue · last wave | 4 | 14 |
+| 75%+ | 2 scavs, 1 Raider · 2 Raiders, 2 PMCs · 1 PMC, 2 Smugglers · 2 Smugglers, 2 Rogues · last wave | 5 | 19 |
+
+"Attackers in all" counts Black Division as the last wave from 50% up (below that they don't come); a boss's wave is the size the table below gives.
 
 **In co-op the waves are bigger.** Each wave is 50% bigger for every player after the first, counted as the siege starts: two of you face waves one and a half times the size, four of you two and a half times (19 attackers become 48 at the top level). One more attacker comes at a time for each extra player too, up to 10. The host's setting decides (see [Settings](#settings)); 0 turns it off. The extra attackers aren't known about on the loading screen, so they load as each wave gathers during the break.
 
-Every siege goes the same way: scavs for the first two waves, then Black Division from the third. The banner says when they first turn up.
+Every siege builds the same way: mixed waves that get harder (scavs with a Raider among them, then Raiders and PMCs, then Smugglers and Rogues), and then the last wave. The banner says who's coming the first time they turn up. Smugglers are the game's own (the bots Acid's Bot Placement System calls Smugglers), so they need no other mod.
+
+**The last wave is a roll of the dice.** Each invasion it's one of the bosses with his people, or Black Division, as likely as the **Last wave** sliders say (see [Settings](#settings)). Black Division are stronger than any boss, so they only come once your defences reach 50%; below that it's always a boss, and an easier one with weaker defences. The banner names who's coming:
+
+| Last wave | Who comes | From defences |
+|---|---|---|
+| Black Division | 4 of them, or 5 at 75%+ | 50% |
+| Reshala | Reshala, 2 guards and 3 scavs | Any |
+| Killa | Killa, alone | 25% |
+| Tagilla | Tagilla, alone | Any |
+| Sanitar | Sanitar, 2 guards and 2 scavs | 25% |
+| Glukhar | Glukhar, 3 guards and 2 Raiders | 50% |
+| Kaban | Kaban, 3 guards and 2 scavs | 50% |
+| Kollontay | Kollontay, 3 guards and 2 scavs | 50% |
+| The Goons | Knight, Big Pipe and Birdeye | 75% |
+
+Only Black Division cut the power: a boss's wave leaves the lights on.
+
+**Bosses in co-op.** A boss's scavs or Raiders grow with the number of you like any wave, but there's still one boss and the guards he had. He has more health instead, by as much as the waves have grown: one and a half times with two of you, two and a half with four. That's how Killa and Tagilla, who come alone, keep up with a bigger group.
 
 **Black Division** is TacticalToaster's mod (its assault troops and raiders). Without it, Raiders and Rogues come instead. Black Division needs MoreBots (with its patcher in `BepInEx/patchers`), SAIN 4.5, WTT CommonLib and WTT ContentBackport; if any is missing it doesn't load, and you get Raiders.
 
@@ -159,6 +179,7 @@ Press F12 (BepInEx Configuration Manager) and look under "Tushonka: Hideout Last
 | Seconds between waves | 25 | Time to heal, reload and loot. |
 | Attackers at once | 7 | The rest wait their turn. |
 | Bigger waves per extra player (%) | 50 | In co-op, how much bigger each wave is for every player after the first. 0 turns it off. The host's setting counts. |
+| Last wave: Black Division (%) and one per boss | Black Division 20, each boss 10 | The chance each is the last wave. They always add up to 100: move one and the others make room (or take up what it gave back), keeping their sizes next to each other. Someone who can't come yet at your defence level leaves his share to those who can. 0 is never. If everyone who could come is at 0, it's an even pick among them. The host's setting counts. |
 | Seconds to loot after winning | 60 | You leave when this runs out. |
 | Leave key | F10 | Leave early after winning. |
 | Allow key / Decline key | F7 / F8 | In co-op, your answer when another player asks to take your gear. |

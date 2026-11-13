@@ -2,6 +2,27 @@
 
 What changed in each version of Tushonka: Hideout Last Stand, newest first. How everything works now is in the [README](README.md).
 
+## 0.3.0 (13 November 2026)
+
+### Changed
+
+- **The waves before the last are mixed, and get harder.** Every siege used to be scavs for two waves, then Black Division for the rest. Now the first wave is scavs (with a Raider among them from 25% defences), then Raiders and PMCs, then Smugglers and Rogues at 50% and up. How many attackers there are in those waves hasn't changed.
+- **The last wave is a boss or Black Division.** Each invasion rolls for it by the new **Last wave** settings. Black Division now only come as that last wave, and only once your defences reach 50%: below that it's always a boss.
+
+### New
+
+- **Bosses.** Reshala comes with guards and scavs, Glukhar with guards and Raiders, Killa and Tagilla alone; Sanitar, Kaban, Kollontay and the Goons can come too, the tougher ones only against better defences. The banner names him.
+- **A slider for Black Division and each boss.** Under Last wave in the F12 settings: each one's chance of being the last wave. They always add up to 100, so pushing one up brings the others down, keeping their sizes next to each other. 0 and he never comes.
+- **Bosses have more health in co-op.** There's only ever one boss, so where a wave would be bigger for more players, he has that much more health instead.
+
+### Fixed
+
+- **Attackers appearing inside the hideout.** With no tunnel to come through, some of each wave waited behind the Emergency Wall's door. In a hideout built out past that wall, the far side of the door is one of your own rooms, so they stood in the middle of your hideout. They only come that way now while the door is shut, nothing else leads round to the far side, and none of you can see where they'd wait. Otherwise the whole wave comes by the front door.
+- **No tunnel in a hideout with a built shooting range.** The range's turnstile cut the range, and Hideout Extensions' range extension beyond it, off from the rest of the hideout, so attackers were never given a tunnel there. In a siege the turnstile no longer stops anyone, you included.
+- **Attackers running on the spot by the cultist gate.** Some of a wave could stand on one spot with a way to you and never take it, and were only moved once nobody was looking at the front door, which could be minutes. One that has a way to you and hasn't moved for 5 seconds is now walked along it a pace at a time until he's going.
+- **Attackers' voices between waves.** The ones waiting furthest up the stairs past the cultist gate could still be heard talking, and so could any voice started another way (by another mod's bots, or sent from another player's game). All of them are silent until the wave starts now.
+- **No countdown to the next invasion on starting the game.** It only appeared once you'd been to another screen and come back to the main menu.
+
 ## 0.2.0 (13 November 2026)
 
 ### Changed

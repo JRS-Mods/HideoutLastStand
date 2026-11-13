@@ -445,7 +445,9 @@ namespace HideoutSiege
             }
             // Not while the menu's still loading after a raid: Start the Defense then would leave it blank.
             if (status.Invaded) { if (!hidden && SiegeLauncher.MenuReady) DrawAlert(unit); }
-            else if (invasionAt > 0f && Screen == EFT.UI.Screens.EEftScreenType.MainMenu) DrawCountdown(unit, "NEXT INVASION", invasionAt);
+            // The menu as it is now, not the last change of screen it told us about: starting the game, it shows the main
+            // menu without telling anyone, and the countdown didn't appear until you'd been to another screen and back.
+            else if (invasionAt > 0f && OnMainMenu) DrawCountdown(unit, "NEXT INVASION", invasionAt);
             GUI.color = Color.white;
         }
 

@@ -44,16 +44,61 @@ namespace HideoutSiege
         }
     }
 
+    /// <summary>Who attacks, weakest first: a siege's waves are mixes of these that get harder, as far as the hideout's defences call for.</summary>
+    internal enum Rung { Scavs, Raiders, Pmcs, Smugglers, Rogues, BlackDivision }
+
+    /// <summary>A boss, the guards he never comes without, and who else comes with him.</summary>
+    internal sealed class BossPack
+    {
+        internal string Name;
+        internal WildSpawnType Boss;
+        internal (WildSpawnType Role, int Count)[] Guards = new (WildSpawnType, int)[0];
+        internal (Rung Rung, int Count)[] Escort = new (Rung, int)[0];
+        internal int FromTier;
+    }
+
     internal sealed class WaveSpec
     {
-        internal readonly int Scavs, Raiders, BlackDivision;
-        internal WaveSpec(int scavs, int raiders, int blackDivision) { Scavs = scavs; Raiders = raiders; BlackDivision = blackDivision; }
+        internal readonly (Rung Rung, int Count)[] Parts;
+        // The boss whose wave this is, if it's one's: he and his guards, and the parts with them.
+        internal readonly BossPack Boss;
+        internal WaveSpec((Rung, int)[] parts, BossPack boss = null) { Parts = parts ?? new (Rung, int)[0]; Boss = boss; }
 
-        /// <summary>The same wave for a bigger group: never smaller, and nobody turns up who wasn't coming.</summary>
-        internal WaveSpec Times(float by) => new WaveSpec(More(Scavs, by), More(Raiders, by), More(BlackDivision, by));
+        /// <summary>
+        /// The same wave for a bigger group: never smaller, nobody turns up who wasn't coming, and still the one boss with
+        /// the guards he had (he's harder to put down instead: see the director's Toughen).
+        /// </summary>
+        internal WaveSpec Times(float by) => new WaveSpec(Parts.Select(p => (p.Rung, p.Count == 0 ? 0 : Mathf.Max(p.Count, Mathf.RoundToInt(p.Count * by)))).ToArray(), Boss);
 
-        private static int More(int count, float by) => count == 0 ? 0 : Mathf.Max(count, Mathf.RoundToInt(count * by));
-        internal int Total => Scavs + Raiders + BlackDivision;
+        internal int Total => Parts.Sum(p => p.Count) + (Boss == null ? 0 : 1 + Boss.Guards.Sum(g => g.Count));
+
+        /// <summary>Black Division cut the power before they come in. Nobody else does, a boss included.</summary>
+        internal bool CutsPower => Boss == null && Parts.Any(p => p.Rung == Rung.BlackDivision && p.Count > 0);
+
+        /// <summary>For the banner: the boss, or the hardest of who's in it; nothing for plain scavs.</summary>
+        internal string Name
+        {
+            get
+            {
+                if (Boss != null) return Boss.Name;
+                switch (Parts.Where(p => p.Count > 0).Select(p => p.Rung).DefaultIfEmpty(Rung.Scavs).Max())
+                {
+                    case Rung.Raiders: return "RAIDERS";
+                    case Rung.Pmcs: return "PMCS";
+                    case Rung.Smugglers: return "SMUGGLERS";
+                    case Rung.Rogues: return "ROGUES";
+                    case Rung.BlackDivision: return SiegeDirector.HaveBlackDivision() ? "BLACK DIVISION" : "RAIDERS AND ROGUES";
+                    default: return "";
+                }
+            }
+        }
+
+        public override string ToString()
+        {
+            string parts = string.Join(" + ", Parts.Select(p => p.Count + " " + p.Rung));
+            if (Boss == null) return parts;
+            return $"{Boss.Name.ToLowerInvariant()} + {Boss.Guards.Sum(g => g.Count)} guards{(parts.Length > 0 ? " + " + parts : "")}";
+        }
     }
 
     /// <summary>
@@ -107,6 +152,7 @@ namespace HideoutSiege
         private int secondQuota, gateStaged, secondStaged;
         private float emergencySide;
         private Vector3 emergencyCentre;
+        private bool emergencyBlown;
         private bool gateCharged;
         internal static readonly HashSet<BotOwner> Waiting = new HashSet<BotOwner>(), Breachers = new HashSet<BotOwner>();
 
@@ -151,18 +197,19 @@ namespace HideoutSiege
 
             int tier = DefenceRating.Tier(DefenceRating.Percent(HideoutCopy.Levels()));
             SiegeState.Tier = tier;
-            waves = DefenceRating.Waves(tier);
+            waves = DefenceRating.Waves(tier, HideoutCopy.Seed);
             // Counted now, with everyone in: on the loading screen nobody knows yet who's joining.
             int defenders = Defenders().Count();
             float more = MoreFor(defenders);
             atOnce = AtOnceFor(defenders);
+            bossHealth = Mathf.Max(more, BossHealthForTest);
             if (more > 1f)
             {
                 waves = waves.Select(w => w.Times(more)).ToArray();
                 Plugin.Log.LogInfo($"[siege] {defenders} defenders: waves are {more:0.##} times the size, {atOnce} attackers at once.");
             }
             SiegeState.TotalWaves = waves.Length;
-            Plugin.Log.LogInfo($"[siege] Tier {tier}: {string.Join(", ", waves.Select(w => w.Scavs + "+" + w.Raiders + "+" + w.BlackDivision))}. Black Division bots: {(HaveBlackDivision() ? "mod" : "stand-ins")}.");
+            Plugin.Log.LogInfo($"[siege] Tier {tier}: {string.Join(", ", waves.Select(w => w.ToString()))}. Black Division bots: {(HaveBlackDivision() ? "mod" : "stand-ins")}.");
 
             SiegeState.Wave = 1;
             // Everything slow happens now, while the screen's still black: your gear, then the whole first wave.
@@ -206,7 +253,7 @@ namespace HideoutSiege
                 {
                     // Nobody's inside before the door goes.
                     if (Time.time >= nextHeldCheck) { nextHeldCheck = Time.time + .5f; KeepOutside(); }
-                    if (holds == 0 && waves[0].BlackDivision > 0 && SiegeState.CountdownUntil - Time.time <= PowerCutBefore) CutThePower();
+                    if (holds == 0 && waves[0].CutsPower && SiegeState.CountdownUntil - Time.time <= PowerCutBefore) CutThePower();
                     // The cultist room's gate goes at the same moment as the front door.
                     if (holds == 0 && !gateCharged && SiegeEntries.Gate != null && SiegeState.CountdownUntil - Time.time <= InnerFuse)
                     {
@@ -258,7 +305,7 @@ namespace HideoutSiege
                 {
                     if (HoldBroken()) { SiegeState.CountdownUntil = Time.time; Net.Broadcast(); }
                     if (Time.time >= nextKeptCheck) { nextKeptCheck = Time.time + .5f; KeepOutside(); }
-                    if (waves[i].BlackDivision > 0 && SiegeState.CountdownUntil - Time.time <= PowerCutBefore) CutThePower();
+                    if (waves[i].CutsPower && SiegeState.CountdownUntil - Time.time <= PowerCutBefore) CutThePower();
                     yield return new WaitForSeconds(.25f);
                 }
                 StopCoroutine(comingIn);
@@ -266,11 +313,11 @@ namespace HideoutSiege
 
                 SetPhase(SiegePhase.Fighting);
                 SiegeSounds.Play("wave");
-                bool firstBlackDivision = waves[i].BlackDivision > 0 && waves.Take(i).All(w => w.BlackDivision == 0);
-                bool firstRaiders = waves[i].Raiders > 0 && waves.Take(i).All(w => w.Raiders == 0 && w.BlackDivision == 0);
+                // Who it is, the first time they turn up (a boss always).
+                string who = waves[i].Name;
+                bool said = waves[i].Boss == null && waves.Take(i).Any(w => w.Name == who);
                 string title = i == waves.Length - 1 ? "FINAL WAVE" : "WAVE " + (i + 1);
-                string elite = HaveBlackDivision() ? "BLACK DIVISION" : "RAIDERS";
-                SiegeState.Announce(firstBlackDivision ? title + " - " + elite : firstRaiders ? title + " - RAIDERS" : title, 4f);
+                SiegeState.Announce(who.Length > 0 && !said ? title + " - " + who : title, 4f);
                 Net.Broadcast();
                 if (second == Second.Tunnel) StartCoroutine(TunnelEntry());
                 else if (second == Second.Emergency) StartCoroutine(EmergencyEntry());
@@ -285,10 +332,62 @@ namespace HideoutSiege
         private static List<WildSpawnType> OrderFor(WaveSpec wave)
         {
             var order = new List<WildSpawnType>();
-            for (int i = 0; i < wave.BlackDivision; i++) order.Add(EliteRole(i));
-            for (int i = 0; i < wave.Raiders; i++) order.Add(i % 2 == 0 ? WildSpawnType.pmcBot : WildSpawnType.exUsec);
-            for (int i = 0; i < wave.Scavs; i++) order.Add(WildSpawnType.assault);
+            foreach (var (rung, count) in wave.Parts)
+                for (int i = 0; i < count; i++) order.Add(RoleOn(rung, i));
+            if (wave.Boss != null)
+            {
+                order.Add(wave.Boss.Boss);
+                foreach (var (role, count) in wave.Boss.Guards)
+                    for (int i = 0; i < count; i++) order.Add(role);
+            }
             return order.OrderBy(_ => UnityEngine.Random.value).ToList();
+        }
+
+        // Smugglers are the game's own (its "arenaFighterEvent" bots, which Acid's Bot Placement System calls Smugglers).
+        private static WildSpawnType RoleOn(Rung rung, int index)
+        {
+            switch (rung)
+            {
+                case Rung.Raiders: return WildSpawnType.pmcBot;
+                case Rung.Pmcs: return index % 2 == 0 ? WildSpawnType.pmcBEAR : WildSpawnType.pmcUSEC;
+                case Rung.Smugglers: return WildSpawnType.arenaFighterEvent;
+                case Rung.Rogues: return WildSpawnType.exUsec;
+                case Rung.BlackDivision: return EliteRole(index);
+                default: return WildSpawnType.assault;
+            }
+        }
+
+        // With more of you, a wave has more in it; but there's only ever the one boss (Killa and Tagilla come alone), so
+        // he takes that much more putting down instead: every part of him, by as much as the waves have grown.
+        private float bossHealth = 1f;
+        /// <summary>For the test driver: a boss's health as it would be with this many times the players' share.</summary>
+        internal static float BossHealthForTest = 1f;
+        private static readonly HashSet<string> toughened = new HashSet<string>();
+
+        private static void Toughen(Profile profile, float by)
+        {
+            try
+            {
+                var role = profile?.Info?.Settings?.Role;
+                if (role == null || !role.Value.ToString().StartsWith("boss", StringComparison.OrdinalIgnoreCase) || profile.Health?.BodyParts == null) return;
+                // Once each: a profile that didn't spawn can come round again.
+                if (!toughened.Add(profile.Id)) return;
+                foreach (var part in profile.Health.BodyParts.Values)
+                {
+                    if (part?.Health == null) continue;
+                    part.Health.Maximum *= by;
+                    part.Health.Current *= by;
+                }
+                Plugin.Log.LogInfo($"[siege] {role} has {by:0.##} times his health, for the number of you.");
+            }
+            catch (Exception e) { Plugin.Log.LogWarning("[siege] Couldn't toughen the boss: " + e.Message); }
+        }
+
+        // A boss or one of his guards: as the game sends them, not hardened like the rest.
+        private static bool BossOrGuard(WildSpawnType role)
+        {
+            string name = role.ToString();
+            return name.StartsWith("boss", StringComparison.OrdinalIgnoreCase) || name.StartsWith("follower", StringComparison.OrdinalIgnoreCase);
         }
 
         private static WildSpawnType EliteRole(int index)
@@ -314,7 +413,7 @@ namespace HideoutSiege
 
         private static BotDifficulty DifficultyFor(WildSpawnType role, int tier)
         {
-            return role == WildSpawnType.assault && tier < 3 ? BotDifficulty.normal : BotDifficulty.hard;
+            return (role == WildSpawnType.assault && tier < 3) || BossOrGuard(role) ? BotDifficulty.normal : BotDifficulty.hard;
         }
 
         // Everyone this hideout's siege will send, for loading up front.
@@ -323,7 +422,7 @@ namespace HideoutSiege
             UnarmedAhead.Clear();
             int tier = DefenceRating.Tier(DefenceRating.Percent(HideoutCopy.Levels()));
             var counts = new Dictionary<WildSpawnType, int>();
-            foreach (var wave in DefenceRating.Waves(tier))
+            foreach (var wave in DefenceRating.Waves(tier, HideoutCopy.Seed))
                 foreach (var role in OrderFor(wave))
                 {
                     counts.TryGetValue(role, out int count);
@@ -421,17 +520,37 @@ namespace HideoutSiege
             var door = SiegeBreach.EmergencyDoor();
             var defenders = Defenders().ToList();
             if (door == null || defenders.Count == 0) return false;
+            bool No(string why)
+            {
+                spots.Clear();
+                Plugin.Log.LogInfo($"[siege] Nobody comes through the Emergency Wall this wave ({why}): they all come by the front door.");
+                return false;
+            }
+            // Only while it's a wall: in a hideout built out past it, its door is one between two of your rooms, and those
+            // waiting "behind" it stood in the middle of your hideout. Once they've blown it, it's the way they made.
+            if (!emergencyBlown && !SiegeBreach.IsShut(door)) return No("its door is open");
             Vector3 centre = SiegeBreach.CentreOf(door), way = emergencyWay;
             Vector3 PointOn(float side) => centre + way * (side * BehindTheDoor);
             float Clearance(Vector3 p) => defenders.Min(d => (d.Position - p).sqrMagnitude);
             float far = Clearance(PointOn(1f)) >= Clearance(PointOn(-1f)) ? 1f : -1f;
-            if (!NavMesh.SamplePosition(PointOn(far), out var hit, 1.5f, NavMesh.AllAreas) || Clearance(hit.position) < SecondEntryAtLeast * SecondEntryAtLeast) return false;
+            if (!NavMesh.SamplePosition(PointOn(far), out var hit, 1.5f, NavMesh.AllAreas)) return No("no floor behind it");
+            if (Clearance(hit.position) < SecondEntryAtLeast * SecondEntryAtLeast) return No("one of you is by it");
+            if (!emergencyBlown)
+            {
+                // With the door shut, a way round to the far side means that side's part of the hideout you're defending.
+                var round = new NavMeshPath();
+                foreach (var defender in defenders)
+                    if (NavMesh.SamplePosition(defender.Position, out var feet, 2f, NavMesh.AllAreas)
+                        && NavMesh.CalculatePath(feet.position, hit.position, NavMesh.AllAreas, round) && round.status == NavMeshPathStatus.PathComplete)
+                        return No("the far side of it is part of your hideout");
+            }
             Vector3 across = Vector3.Cross(Vector3.up, way);
             for (int i = 0; i < 6; i++)
             {
                 Vector3 spot = hit.position + way * far * (i % 2) * .8f + across * (i / 2 - 1) * .8f;
                 spots.Add(NavMesh.SamplePosition(spot, out var near, 1.5f, NavMesh.AllAreas) ? near.position : hit.position);
             }
+            if (spots.Any(SiegeMoves.Seen)) return No("you'd see them waiting");
             emergencySide = far;
             emergencyCentre = centre;
             Plugin.Log.LogInfo($"[siege] Some of this wave come through the Emergency Wall at {centre:F2}, from {hit.position:F2}.");
@@ -455,6 +574,7 @@ namespace HideoutSiege
                 yield return new WaitForSeconds(InnerFuse);
                 SiegeBreach.Blast(at);
                 Net.SendDoor(true, at);
+                emergencyBlown = true;
                 yield return new WaitForSeconds(DoorClearsAfter);
                 breachInProgress = false;
             }
@@ -689,6 +809,11 @@ namespace HideoutSiege
         {
             SiegeState.Phase = phase;
             Plugin.Log.LogInfo($"[siege] {phase}, wave {SiegeState.Wave}/{SiegeState.TotalWaves}");
+            if (phase == SiegePhase.Fighting && SiegeQuiet.Kept > 0)
+            {
+                Plugin.Log.LogInfo($"[siege] Kept {SiegeQuiet.Kept} of the waiting attackers' voice lines quiet before this wave.");
+                SiegeQuiet.Kept = 0;
+            }
             Net.Broadcast();
         }
 
@@ -736,7 +861,9 @@ namespace HideoutSiege
         internal static WildSpawnType StandIn(WildSpawnType role, ICollection<WildSpawnType> unarmed)
         {
             var troops = (WildSpawnType)BlackDivisionRoles[0];
-            if (HaveBlackDivision() && role != troops && role != WildSpawnType.pmcBot && role != WildSpawnType.exUsec && role != WildSpawnType.assault && !unarmed.Contains(troops)) return troops;
+            // Only for Black Division's own (its roles are numbered together): a boss or a smuggler with no gear isn't one of theirs.
+            bool theirs = (int)role >= 848420 && (int)role <= 848429;
+            if (HaveBlackDivision() && theirs && role != troops && !unarmed.Contains(troops)) return troops;
             if (role == WildSpawnType.assault || (unarmed.Contains(WildSpawnType.pmcBot) && unarmed.Contains(WildSpawnType.exUsec))) return WildSpawnType.assault;
             return UnityEngine.Random.value < .5f && !unarmed.Contains(WildSpawnType.pmcBot) ? WildSpawnType.pmcBot : !unarmed.Contains(WildSpawnType.exUsec) ? WildSpawnType.exUsec : WildSpawnType.pmcBot;
         }
@@ -760,6 +887,7 @@ namespace HideoutSiege
                 if (data == null || data.Count == 0) { Plugin.Log.LogError("[siege] Couldn't get a bot from the server."); return; }
                 if (finished) return;
                 foreach (var profile in data.Profiles) SiegeNvg.Equip(profile);
+                if (bossHealth > 1f) foreach (var profile in data.Profiles) Toughen(profile, bossHealth);
                 var point = staging ? HiddenSpawn() : spawnPoints[0];
                 arriving.Add(Time.time);
                 spawner.SpawnBotsInZoneOnPositions(new List<ISpawnPoint> { point.SpawnPoint }, SiegeMap.Zone, data, OnSpawned);
@@ -817,6 +945,11 @@ namespace HideoutSiege
             attackers.Add(bot);
             bot.GetPlayer.OnPlayerDeadOrUnspawn += _ => { SiegeState.Kills++; };
             Plugin.Log.LogInfo($"[siege] {bot.Profile.Info.Settings.Role} in at {bot.Position}. Alive: {attackers.Count}");
+            if (role.ToString().StartsWith("boss", StringComparison.OrdinalIgnoreCase))
+            {
+                var whole = bot.GetPlayer.ActiveHealthController?.GetBodyPartHealth(EBodyPart.Common);
+                if (whole != null) Plugin.Log.LogInfo($"[siege] {role}'s health: {whole.Value.Current:F0} of {whole.Value.Maximum:F0}.");
+            }
             if (staging)
             {
                 Wait(bot);
@@ -837,7 +970,10 @@ namespace HideoutSiege
                 wayIn[bot] = Way.Stairs;
                 spot = HoldingSpot(0);
             }
-            else if (secondStaged < secondQuota && secondSpots.Count > 0)
+            // The second way, unless one of you has since come where you'd see him appear there: then with the rest.
+            // Never the boss himself: he comes by the front door with whoever's with him, not on his own down a tunnel.
+            else if (secondStaged < secondQuota && secondSpots.Count > 0 && !bot.Profile.Info.Settings.Role.ToString().StartsWith("boss", StringComparison.OrdinalIgnoreCase)
+                && !(second == Second.Emergency && SiegeMoves.Seen(secondSpots[secondStaged % secondSpots.Count])))
             {
                 wayIn[bot] = Way.Second;
                 spot = secondSpots[secondStaged++ % secondSpots.Count];

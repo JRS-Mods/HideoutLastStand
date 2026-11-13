@@ -14,6 +14,9 @@ namespace HideoutSiege
     /// </summary>
     internal static class SiegeQuiet
     {
+        /// <summary>Voice lines kept quiet since the last wave started, for the log.</summary>
+        internal static int Kept;
+
         internal static bool Is(Player player)
         {
             if (player == null || player.IsYourPlayer || !SiegeLauncher.InSiege) return false;
@@ -50,20 +53,36 @@ namespace HideoutSiege
     }
 
     // What they say to each other. A voice only knows where it is, not whose it is; nobody else is ever where they wait.
-    [HarmonyPatch(typeof(BaseSpeaker), nameof(BaseSpeaker.Play))]
+    // Every way a voice is started, not only the usual one: other mods' bots, and voices sent from another game, come by the rest.
+    [HarmonyPatch]
     internal static class QuietVoicePatch
     {
-        [HarmonyPrefix]
-        private static bool Prefix(BaseSpeaker __instance, EPhraseTrigger trigger)
+        private static IEnumerable<MethodBase> TargetMethods()
         {
-            if (trigger == EPhraseTrigger.OnDeath || trigger == EPhraseTrigger.OnAgony || !SiegeLauncher.InSiege) return true;
+            foreach (string name in new[] { nameof(BaseSpeaker.Play), "PlayDirect", "PlayDirectRandom", "PlayExternal" })
+                foreach (var method in AccessTools.GetDeclaredMethods(typeof(BaseSpeaker)).Where(m => m.Name == name && m.GetParameters().Any(p => p.ParameterType == typeof(EPhraseTrigger))))
+                    yield return method;
+        }
+
+        [HarmonyPrefix]
+        private static bool Prefix(BaseSpeaker __instance, object[] __args)
+        {
+            if (!SiegeLauncher.InSiege) return true;
+            foreach (object arg in __args)
+                if (arg is EPhraseTrigger trigger && (trigger == EPhraseTrigger.OnDeath || trigger == EPhraseTrigger.OnAgony)) return true;
             var where = __instance.TrackTransform;
             if (where == null) return true;
-            Vector3 at = where.position;
-            if (SiegeQuiet.Hidden(at)) return false;
+            // A voice is at its owner's head. Where they wait is known by its floor, and those past the gate stand up a flight
+            // of stairs: the heads of the ones furthest up were above what counted as "where they wait", and were heard.
+            Vector3 at = where.position, feet = at - Vector3.up * 1.5f;
+            if (SiegeQuiet.Hidden(at) || SiegeQuiet.Hidden(feet)) { SiegeQuiet.Kept++; return false; }
             // The host knows the ones waiting anywhere else: up the stairs, or behind the Emergency Wall.
             foreach (var bot in SiegeDirector.Waiting)
-                if (bot != null && !bot.IsDead && (bot.Position - at).sqrMagnitude < 1f) return false;
+            {
+                if (bot == null || bot.IsDead) continue;
+                Vector3 off = at - bot.Position;
+                if (off.x * off.x + off.z * off.z < 1f && off.y > -.5f && off.y < 2.5f) { SiegeQuiet.Kept++; return false; }
+            }
             return true;
         }
     }

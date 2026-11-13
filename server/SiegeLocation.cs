@@ -17,7 +17,7 @@ namespace HideoutSiege.Server;
 /// Turns the unused "Suburbs" location into the siege map: a normal raid's settings, with the hideout's scene and spawns.
 /// </summary>
 [Injectable(TypePriority = OnLoadOrder.Preload + 50)]
-public sealed class SiegeLocation(LocationTable locations, LocaleTable locales, LocationConfig config, BotConfig bots, ICloner cloner, ISptLogger<SiegeLocation> logger) : IOnLoad
+public sealed class SiegeLocation(LocationTable locations, LocaleTable locales, LocationConfig config, BotConfig bots, PmcConfig pmcs, ICloner cloner, ISptLogger<SiegeLocation> logger) : IOnLoad
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
@@ -86,6 +86,9 @@ public sealed class SiegeLocation(LocationTable locations, LocaleTable locales, 
         // SPT looks these up by map name for every scav it spawns.
         bots.AssaultBrainType[key] = bots.AssaultBrainType["factory4_day"];
         bots.PlayerScavBrainType[key] = bots.PlayerScavBrainType["factory4_day"];
+        // And for every PMC: some of the attackers are PMCs, and without this the game logs an error for each as he arrives.
+        foreach (var side in pmcs.PmcType.Values)
+            if (side.TryGetValue("factory4_day", out var brains)) side[key] = brains;
         config.LooseLootMultiplier[key] = 0;
         config.StaticLootMultiplier[key] = 0;
         slot.LooseLoot = new LazyLoad<LooseLoot>(() => new LooseLoot { Spawnpoints = [], SpawnpointsForced = [], SpawnpointCount = new SpawnpointCount { Mean = 1, Std = .1 } });

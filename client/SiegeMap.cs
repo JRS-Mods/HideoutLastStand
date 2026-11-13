@@ -31,6 +31,7 @@ namespace HideoutSiege
             SiegeSandbags.ArmDecor();
             SiegeSteel.Arm();
             SiegeBarbedWire.Arm();
+            OpenTheRange();
             SiegeEntries.BuildTunnel();
             BuildNavMesh();
             Zone = BuildZone();
@@ -48,10 +49,31 @@ namespace HideoutSiege
             SiegeSandbags.ArmDecor();
             SiegeSteel.Arm();
             SiegeBarbedWire.Arm();
+            OpenTheRange();
             if (HideoutCopy.CopiesBuilt) SiegeEntries.BuildTunnel();
             BuildNavMesh();
             EntrancePoints.AddRange(FindEntrances());
             SiegeEntries.Prepare();
+        }
+
+        // A built shooting range has a turnstile across its way in: a bar at chest height, which nobody's floor goes under.
+        // With it there the range is cut off from the hideout, and so is Hideout Extensions' range extension beyond it, so
+        // no tunnel could come out there. In a siege the bar doesn't stop anyone, attackers or you.
+        private static void OpenTheRange()
+        {
+            int opened = 0;
+            foreach (var c in Object.FindObjectsOfType<Collider>())
+            {
+                if (!c.enabled || c.isTrigger || c.name.IndexOf("turnstile", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (PathOf(c.transform).IndexOf("shooting_range", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                // What you walk into, not what stops a bullet.
+                if (((1 << c.gameObject.layer) & EFTHardSettings.Instance.MOVEMENT_MASK) == 0) continue;
+                c.enabled = false;
+                opened++;
+            }
+            if (opened == 0) return;
+            Physics.SyncTransforms();
+            Plugin.Log.LogInfo($"[map] The shooting range's turnstile doesn't stop anyone in a siege ({opened} collider(s)).");
         }
 
         internal static void Clear()
@@ -85,12 +107,18 @@ namespace HideoutSiege
         private static Dictionary<(int, int, int), Vector3> WalkFloor()
         {
             int mask = EFTHardSettings.Instance.MOVEMENT_MASK;
-            var cells = new Dictionary<(int, int, int), Vector3>();
-            var queue = new Queue<Vector3>();
             // The player's spawn, unless something's been moved on to it: then just inside the front door, then by the beds.
             Vector3 start = default;
             var starts = new[] { new Vector3(-5.8f, .1f, -5.4f), SiegeBreach.Doorway - SiegeBreach.Outward * 1.5f + Vector3.up * .1f, HideoutCopy.InRestSpace(new Vector3(14.4f, .1f, -3.4f)) };
             if (!starts.Any(s => Floor(s, 1.5f, mask, out start) && Mathf.Abs(start.y) < .3f)) { Plugin.Log.LogError("[map] No floor at the player's spawn, the front door or the beds."); return null; }
+            return WalkFrom(start);
+        }
+
+        private static Dictionary<(int, int, int), Vector3> WalkFrom(Vector3 start)
+        {
+            int mask = EFTHardSettings.Instance.MOVEMENT_MASK;
+            var cells = new Dictionary<(int, int, int), Vector3>();
+            var queue = new Queue<Vector3>();
             cells[Key(start)] = start;
             queue.Enqueue(start);
             var directions = new[] { new Vector3(Cell, 0, 0), new Vector3(-Cell, 0, 0), new Vector3(0, 0, Cell), new Vector3(0, 0, -Cell) };
@@ -125,6 +153,69 @@ namespace HideoutSiege
         {
             if (preWalk == null) preWalk = WalkFloor()?.Values.ToList() ?? new List<Vector3>();
             return preWalk.Any(p => area.Contains(new Vector2(p.x, p.z)) && Mathf.Abs(p.y - y) < 1f);
+        }
+
+        /// <summary>
+        /// For the log, when the floor doesn't reach a room: the floor walked from inside that room instead, where it comes
+        /// nearest the rest, and what stands between the two at each height.
+        /// </summary>
+        internal static string WhyNot(Rect area, float y, string name)
+        {
+            int mask = EFTHardSettings.Instance.MOVEMENT_MASK;
+            Vector3 start = default;
+            bool found = false;
+            for (int i = 0; i < 25 && !found; i++)
+            {
+                var p = new Vector3(Mathf.Lerp(area.xMin, area.xMax, (i % 5 + .5f) / 5f), y + .1f, Mathf.Lerp(area.yMin, area.yMax, (i / 5 + .5f) / 5f));
+                found = Floor(p, 1.5f, mask, out start);
+            }
+            if (!found) return $"[map] The {name}: no floor to stand on anywhere in it.";
+            var island = WalkFrom(start).Values.ToList();
+            var main = preWalk ?? new List<Vector3>();
+            if (main.Count == 0) return $"[map] The {name}: the hideout's own floor wasn't walked.";
+            var box = new Bounds(main[0], Vector3.zero);
+            foreach (var p in main) box.Encapsulate(p);
+            box.Expand(8f);
+            var near = island.Where(box.Contains).ToList();
+            var text = new System.Text.StringBuilder($"[map] The {name} can't be walked to. Walked from inside it: {island.Count * Cell * Cell:F0} m2, x {island.Min(p => p.x):F1} to {island.Max(p => p.x):F1}, z {island.Min(p => p.z):F1} to {island.Max(p => p.z):F1}, y {island.Min(p => p.y):F2} to {island.Max(p => p.y):F2}.");
+            if (near.Count == 0) return text.Append(" None of it comes within 4 m of the hideout's floor.").ToString();
+            Vector3 a = default, b = default;
+            float best = float.MaxValue;
+            foreach (var q in near)
+                foreach (var p in main)
+                {
+                    float d = (p - q).sqrMagnitude;
+                    if (d < best) { best = d; a = p; b = q; }
+                }
+            text.Append($" Nearest: the hideout's floor at {a:F2}, the room's at {b:F2}, {Mathf.Sqrt(best):F2} m apart.");
+            // The widest stretch where the two run alongside each other: how broad whatever's between them is.
+            var facing = near.Where(q => main.Any(p => (p - q).sqrMagnitude < best + .5f)).ToList();
+            text.Append($" {facing.Count} of the room's cells are that close, x {facing.Min(p => p.x):F1} to {facing.Max(p => p.x):F1}, z {facing.Min(p => p.z):F1} to {facing.Max(p => p.z):F1}.");
+            SiegeBreach.WithDoorsOpen(() => SiegeDecor.WithDefencesOut(() =>
+            {
+                Vector3 across = b - a;
+                float length = across.magnitude;
+                foreach (float h in new[] { .15f, .35f, .55f, .8f, 1f, 1.2f, 1.4f, 1.7f, 2f })
+                {
+                    Vector3 from = a + Vector3.up * h;
+                    if (!Physics.Raycast(from, across / length, out var hit, length, mask, QueryTriggerInteraction.Ignore)) { text.Append($"\n   at {h:F2} m: clear"); continue; }
+                    var c = hit.collider;
+                    text.Append($"\n   at {h:F2} m: {PathOf(c.transform)} ({LayerMask.LayerToName(c.gameObject.layer)}, {c.GetType().Name}), {hit.distance:F2} m along, from {c.bounds.min:F2} to {c.bounds.max:F2}");
+                }
+                // Straight down between them: a drop, or the top of what's in the way.
+                Vector3 middle = (a + b) / 2f;
+                text.Append(Physics.Raycast(middle + Vector3.up * 2.2f, Vector3.down, out var top, 5f, mask, QueryTriggerInteraction.Ignore)
+                    ? $"\n   halfway, looking down from 2.2 m: {PathOf(top.collider.transform)} at y {top.point.y:F2} (the hideout's floor there is {a.y:F2}, the room's {b.y:F2})"
+                    : "\n   halfway, looking down from 2.2 m: nothing for 5 m");
+            }));
+            return text.ToString();
+        }
+
+        private static string PathOf(Transform t)
+        {
+            var parts = new List<string>();
+            for (int i = 0; t != null && i < 6; t = t.parent, i++) parts.Insert(0, t.name);
+            return string.Join("/", parts);
         }
 
         // The walked floor, made into the attackers' NavMesh.

@@ -27,6 +27,8 @@ namespace HideoutSiege.Dev
         private void Awake()
         {
             if (int.TryParse(Environment.GetEnvironmentVariable("SIEGE_ROLL"), out int roll)) HideoutCopy.NextRoll = roll;
+            // SIEGE_BOSSHEALTH: a boss's health as with more players (1.5 = two of you).
+            if (float.TryParse(Environment.GetEnvironmentVariable("SIEGE_BOSSHEALTH"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bossHealth)) SiegeDirector.BossHealthForTest = bossHealth;
             Log = Logger;
             shots = Path.Combine(Path.GetDirectoryName(Info.Location), IsCoopClient ? "shots_client" : "shots");
             Directory.CreateDirectory(shots);
@@ -957,6 +959,17 @@ namespace HideoutSiege.Dev
                     var app = Singleton<ClientApplication<IEftSession>>.Instance as TarkovApplication;
                     if (app == null || Traverse.Create(app).Field<MainMenuShowOperation>("_menuOperation").Value == null) return;
                     if (backAt > 0f) return;
+                    // SIEGE_BOOTSHOT: the main menu as the game starts, before anything's asked of it (the countdown to the next invasion).
+                    if (Environment.GetEnvironmentVariable("SIEGE_BOOTSHOT") != null && !bootShot)
+                    {
+                        if (bootSeenAt < 0f) { bootSeenAt = Time.realtimeSinceStartup; return; }
+                        if (Time.realtimeSinceStartup - bootSeenAt < 20f) return;
+                        bootShot = true;
+                        ScreenCapture.CaptureScreenshot(Path.Combine(shots, "boot_menu.png"));
+                        Logger.LogInfo("[test] The menu as the game started: pictured it.");
+                        nextTry = Time.realtimeSinceStartup + 3f;
+                        return;
+                    }
                     if (menuSeenAt < 0)
                     {
                         menuSeenAt = Time.realtimeSinceStartup;
@@ -1010,6 +1023,15 @@ namespace HideoutSiege.Dev
                     }
                     else
                     {
+                        // SIEGE_LAST: the last wave of each siege in turn, by name ("KILLA,GLUKHAR,bd").
+                        string lasts = Environment.GetEnvironmentVariable("SIEGE_LAST");
+                        if (lasts != null)
+                        {
+                            var each = lasts.Split(',');
+                            DefenceRating.ForceLast = each[Mathf.Min(launched, each.Length - 1)].Trim();
+                            Logger.LogInfo("[test] This siege's last wave: " + DefenceRating.ForceLast);
+                        }
+                        launched++;
                         Logger.LogInfo("Launching the siege.");
                         Logger.LogInfo($"[take] At the menu: {app.Session.Profile.Inventory.FastAccess.BoundItems.Count} binds.");
                         if (int.TryParse(Environment.GetEnvironmentVariable("SIEGE_SECURITY"), out int security))
@@ -1057,7 +1079,9 @@ namespace HideoutSiege.Dev
             }
         }
 
-        private float nextTelemetry, nextGod;
+        private float nextTelemetry, nextGod, bootSeenAt = -1f;
+        private bool bootShot;
+        private int launched;
         private int loops = int.TryParse(Environment.GetEnvironmentVariable("SIEGE_LOOPS"), out int n) ? n : 1;
 
         // Through the end-of-raid screens as a player goes, with NEXT on each, picturing each one (the siege's defeat screen too).

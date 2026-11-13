@@ -26,6 +26,9 @@ namespace HideoutSiege
         internal static void Equip(Profile profile)
         {
             if (profile?.Info?.Settings == null || profile.Info.Settings.Role == WildSpawnType.assault) return;
+            // Bosses and their guards come as they are: nobody straps goggles on Reshala.
+            string role = profile.Info.Settings.Role.ToString();
+            if (role.StartsWith("boss", StringComparison.OrdinalIgnoreCase) || role.StartsWith("follower", StringComparison.OrdinalIgnoreCase)) return;
             try
             {
                 var head = profile.Inventory.Equipment.GetSlot(EquipmentSlot.Headwear);
