@@ -7,6 +7,7 @@ What changed in each version of Tushonka: Hideout Last Stand, newest first. How 
 ### Fixed
 
 - **Smugglers standing still.** With SAIN installed, a Smuggler would walk in, look at you and do nothing. SAIN takes the game's own fighting away from them and never gave them its own, so they had neither. The siege now has SAIN give them its fighting, as it does for Raiders. Once you've been in a siege, the same goes for the game's Bloodhounds in your other raids until you restart the game.
+- **Gun pictures taking about 3 seconds when looting a body.** In the siege, a gun's picture in a loot panel was blank for about 3 seconds every time, and attackers and their guns were drawn with their roughest textures. The game keeps textures within a budget sized for a raid's map, and the hideout's own textures, which are always loaded in full, had used all of it. The siege now adds what the hideout holds to that budget, so pictures come up at once and textures are as sharp as in any raid. It uses more video memory in the siege (about 450 MB more in testing), and goes back to the game's own figure when you leave.
 - **Attackers walking back and forth at the front door.** An attacker who had a clear line to you but hadn't noticed you was left to himself, wandered back out of sight, was sent in again, and so on: Killa could spend a whole wave doing it, and bosses, their guards and scavs all did it at times. They keep coming now until they've actually noticed you.
 
 ## 0.3.0 (13 November 2026)

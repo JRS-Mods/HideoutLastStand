@@ -81,6 +81,7 @@ namespace HideoutSiege
                 nextSlow = Time.unscaledTime + 1f;
                 SiegeGun.OfferAsDecor();
                 SiegeMannequins.Remember();
+                SiegeTextures.Tick();
             }
             if (SiegeState.Phase == SiegePhase.Won && Input.GetKeyDown(LeaveKey.Value)) SiegeExit.Leave(ExitStatus.Survived);
             SiegeAsk.Update();

@@ -1214,6 +1214,71 @@ namespace HideoutSiege.Dev
                 }
             }
             Logger.LogInfo(sb.ToString());
+            if (Environment.GetEnvironmentVariable("SIEGE_STREAMLOG") != null)
+            {
+                Logger.LogInfo(StreamState());
+                if (!iconBusy && bots != null && SiegeState.Phase == SiegePhase.Fighting)
+                    foreach (var b in System.Linq.Enumerable.ToList(bots))
+                    {
+                        if (b == null || b.IsDead) continue;
+                        var gun = b.GetPlayer?.HandsController?.Item;
+                        if (gun == null) continue;
+                        StartCoroutine(IconTest(gun));
+                        break;
+                    }
+            }
+        }
+
+        // SIEGE_STREAMLOG: asks the game for a gun's picture the way a loot panel does, and times it.
+        private bool iconBusy;
+        private ItemIconCreator iconMaker;
+
+        private System.Collections.IEnumerator IconTest(EFT.InventoryLogic.Item gun)
+        {
+            iconBusy = true;
+            float asked = Time.realtimeSinceStartup;
+            ItemIcon icon = null;
+            try
+            {
+                if (iconMaker == null) iconMaker = new ItemIconCreator(Singleton<Diz.Resources.IEasyAssets>.Instance, Singleton<ObjectsFactory>.Instance);
+                var get = typeof(ItemIconCreator).GetMethod("GetItemIcon");
+                var sizeType = get.GetParameters()[1].ParameterType.GetElementType();
+                object size = Activator.CreateInstance(sizeType);
+                foreach (var f in sizeType.GetFields()) if (f.FieldType == typeof(int)) f.SetValue(size, f.Name.ToUpperInvariant().Contains("X") ? 4 : 2);
+                icon = (ItemIcon)get.Invoke(iconMaker, new object[] { gun, size, true });
+            }
+            catch (Exception e) { Logger.LogWarning("[icon] couldn't ask: " + (e.InnerException ?? e)); }
+            if (icon == null) { yield return new WaitForSecondsRealtime(10f); iconBusy = false; yield break; }
+            int frames = 0;
+            float nextLine = 0f;
+            while (icon.Sprite == null && Time.realtimeSinceStartup - asked < 15f)
+            {
+                frames++;
+                if (Time.realtimeSinceStartup >= nextLine) { nextLine = Time.realtimeSinceStartup + 1f; Logger.LogInfo("[icon] waiting " + StreamState()); }
+                yield return null;
+            }
+            Logger.LogInfo($"[icon] {gun.ShortName}: {(icon.Sprite == null ? "never came" : "ready")} after {Time.realtimeSinceStartup - asked:F2} s, {frames} frames.");
+            yield return new WaitForSecondsRealtime(6f);
+            iconBusy = false;
+        }
+
+        // SIEGE_STREAMLOG: how the game's texture streaming stands (item pictures wait on it for a gun's full textures).
+        private static string StreamState()
+        {
+            const float mb = 1024f * 1024f;
+            string loop = "";
+            void Walk(UnityEngine.LowLevel.PlayerLoopSystem system)
+            {
+                if (system.type != null && system.type.Name.Contains("TextureStreaming")) loop += " " + system.type.Name;
+                if (system.subSystemList != null) foreach (var sub in system.subSystemList) Walk(sub);
+            }
+            Walk(UnityEngine.LowLevel.PlayerLoop.GetCurrentPlayerLoop());
+            int cameras = 0, streaming = 0;
+            foreach (var cam in Camera.allCameras) { cameras++; if (cam.GetComponent("StreamingController") != null) streaming++; }
+            return $"[stream] active={QualitySettings.streamingMipmapsActive} budget={QualitySettings.streamingMipmapsMemoryBudget:F0} reduction={QualitySettings.streamingMipmapsMaxLevelReduction} allCameras={QualitySettings.streamingMipmapsAddAllCameras}" +
+                $" total={Texture.totalTextureMemory / mb:F0} desired={Texture.desiredTextureMemory / mb:F0} target={Texture.targetTextureMemory / mb:F0} current={Texture.currentTextureMemory / mb:F0} nonStreaming={Texture.nonStreamingTextureMemory / mb:F0}" +
+                $" textures={Texture.streamingTextureCount} pending={Texture.streamingTexturePendingLoadCount} loading={Texture.streamingTextureLoadingCount} uploads={Texture.streamingMipmapUploadCount} renderers={Texture.streamingRendererCount}" +
+                $" discard={Texture.streamingTextureDiscardUnusedMips} forceAll={Texture.streamingTextureForceLoadAll} cameras={cameras} withController={streaming} loop:{(loop == "" ? " none" : loop)} iconRequests={ItemIconCreator.requests} mipBudget={ItemIconCreator.mipBudget}";
         }
 
         private static bool IsCoopClient => Environment.GetEnvironmentVariable("SIEGE_ROLE") == "client";
