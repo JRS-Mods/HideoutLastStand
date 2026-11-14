@@ -30,6 +30,26 @@ namespace HideoutSiege
             // layer is above SAIN's, so while it's walking an attacker to you, SAIN's isn't running and nothing moved him: he
             // stood with a route to you and never took a step (most of those "isn't getting anywhere"). Its legs run then.
             Patch(harmony, "SAIN's walking", "SAIN.Patches.Movement.BotMoverManualFixedUpdatePatch", "PatchPrefix", nameof(SainLegs));
+            SainForSmugglers();
+        }
+
+        // Smugglers are the game's arenaFighterEvent, which thinks with the PMC brain. SAIN takes that brain's own fighting
+        // away from them (as it does for Raiders, who share it) but only gives its own to the ArenaFighter brain, so they
+        // were left with neither: one would stand and look at you. This gives them SAIN's, the way SAIN gives it to Raiders.
+        private static void SainForSmugglers()
+        {
+            try
+            {
+                var add = AccessTools.Method("SAIN.BigBrainHandler+BrainAssignment:AddCustomLayersToRaiders");
+                if (add == null)
+                {
+                    if (AccessTools.TypeByName("SAIN.SAINPlugin") != null) Plugin.Log.LogWarning("[compat] This SAIN has no way to give Smugglers its fighting: they may stand still.");
+                    return;
+                }
+                add.Invoke(null, new object[] { new System.Collections.Generic.List<EFT.WildSpawnType> { EFT.WildSpawnType.arenaFighterEvent } });
+                Plugin.Log.LogInfo("[compat] Smugglers fight with SAIN.");
+            }
+            catch (Exception e) { Plugin.Log.LogWarning("[compat] Couldn't give Smugglers SAIN's fighting: " + (e.InnerException ?? e).Message); }
         }
 
         private static bool earlyApplied;

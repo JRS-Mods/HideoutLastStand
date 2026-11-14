@@ -105,7 +105,10 @@ namespace HideoutSiege
             if (Time.time >= track.NextLook)
             {
                 track.NextLook = Time.time + LookEvery;
-                track.Seeing = Sees(bot);
+                // A clear line to you isn't enough to leave him to his own AI: looking the other way he hasn't noticed you,
+                // and his patrol would walk him back out of sight, to be sent in again, back and forth. He's only left to
+                // it once it has someone to fight.
+                track.Seeing = Sees(bot) && Noticed(bot);
                 if (track.Seeing) track.LastSeen = Time.time;
             }
             if (track.Seeing || Time.time - track.LastSeen < PushAfter) return false;
@@ -144,6 +147,12 @@ namespace HideoutSiege
             sprint = best > SprintFrom * SprintFrom;
             track.ToYou = true;
             return true;
+        }
+
+        private static bool Noticed(BotOwner bot)
+        {
+            try { return bot.Memory?.GoalEnemy != null; }
+            catch (Exception) { return false; }
         }
 
         // In sight of any of you: what its own AI says, or a clear line from its eyes to one of you.

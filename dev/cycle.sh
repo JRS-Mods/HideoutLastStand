@@ -18,10 +18,10 @@ cp client/bin/Release/HideoutSiege.dll /f/SPT/BepInEx/plugins/HideoutSiege/
 cp brains/bin/Release/HideoutSiege.Brains.dll /f/SPT/BepInEx/plugins/HideoutSiege/
 mkdir -p /f/SPT/BepInEx/plugins/HideoutSiege/sounds; cp assets/sounds/*.wav /f/SPT/BepInEx/plugins/HideoutSiege/sounds/ 2>/dev/null
 mkdir -p /f/SPT/BepInEx/plugins/HideoutSiege/models; cp assets/models/* /f/SPT/BepInEx/plugins/HideoutSiege/models/ 2>/dev/null
-cp dev/bin/Release/HideoutSiege.Dev.dll /f/SPT/BepInEx/plugins/HideoutSiege.Dev/
+mkdir -p /f/SPT/BepInEx/plugins/HideoutSiege.Dev; cp dev/bin/Release/HideoutSiege.Dev.dll /f/SPT/BepInEx/plugins/HideoutSiege.Dev/
 cp server/bin/Release/HideoutSiege.Server.dll /f/SPT/SPT_Runtime/user/mods/HideoutSiege.Server/
 rm -f /f/SPT/BepInEx/plugins/HideoutSiege.Dev/shots/* /f/SPT/BepInEx/siege_server.log
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\Tushonka - Hideout Siege\dev\run.ps1' >/dev/null 2>&1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\Tushonka - Hideout Siege\dev\run.ps1' ${SIEGE_TOKEN:+-Token $SIEGE_TOKEN} >/dev/null 2>&1
 sleep 15
 start=$SECONDS
 while [ $((SECONDS-start)) -lt "$MAX" ]; do

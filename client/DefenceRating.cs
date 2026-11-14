@@ -59,6 +59,7 @@ namespace HideoutSiege
         // without that mod).
         internal static WaveSpec[] Waves(int tier, int? seed)
         {
+            if (ForceWaves != null && ForceWaves.Length > 0) return ForceWaves.Select(w => Forced(w, tier)).ToArray();
             WaveSpec[] build;
             switch (tier)
             {
@@ -96,6 +97,28 @@ namespace HideoutSiege
         /// </summary>
         /// <summary>For the test driver: the last wave the next sieges get, whatever the roll (a boss's name, or "bd").</summary>
         internal static string ForceLast;
+
+        /// <summary>
+        /// For the test driver: every wave of the next sieges, in order, whatever the defences and the roll. Each is a
+        /// boss's name, "bd", or a kind of attacker ("smugglers", "rogues": three of them, or "2 smugglers + 2 rogues").
+        /// </summary>
+        internal static string[] ForceWaves;
+
+        private static WaveSpec Forced(string wave, int tier)
+        {
+            wave = wave.Trim();
+            var boss = Bosses.FirstOrDefault(b => string.Equals(b.Name, wave, System.StringComparison.OrdinalIgnoreCase));
+            if (boss != null) return new WaveSpec(boss.Escort, boss);
+            if (string.Equals(wave, "bd", System.StringComparison.OrdinalIgnoreCase)) return Wave((Rung.BlackDivision, BlackDivisionCloses[UnityEngine.Mathf.Clamp(tier, 1, 4) - 1]));
+            var parts = new List<(Rung, int)>();
+            foreach (string part in wave.Split('+'))
+            {
+                string[] words = part.Trim().Split(' ');
+                int count = words.Length > 1 && int.TryParse(words[0], out int n) ? n : 3;
+                if (System.Enum.TryParse(words[words.Length - 1], true, out Rung rung)) parts.Add((rung, count));
+            }
+            return new WaveSpec(parts.Count > 0 ? parts.ToArray() : new[] { (Rung.Scavs, 2) });
+        }
 
         private static WaveSpec LastWave(int tier, int? seed)
         {

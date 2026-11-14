@@ -155,7 +155,7 @@ Only Black Division cut the power: a boss's wave leaves the lights on.
 
 What you need is in the table at the top ([What you need](#what-you-need)). In more detail:
 
-- **SAIN:** attackers run on SAIN if it's installed. SAIN's bots hold cover while they can't see you, so the siege takes over an attacker that hasn't seen any of you for a few seconds and walks it toward the nearest of you, blowing doors on the way; once one of you is in sight, SAIN fights. This uses BigBrain, which SAIN needs anyway.
+- **SAIN:** attackers run on SAIN if it's installed. SAIN's bots hold cover while they can't see you, so the siege takes over an attacker that hasn't seen any of you for a few seconds and walks it toward the nearest of you, blowing doors on the way; once one of them has noticed you, SAIN fights. Smugglers fight with SAIN too: SAIN doesn't give them its fighting by itself, so the siege has it do so. This uses BigBrain, which SAIN needs anyway.
 - **Bot mods with gear of their own:** a type whose bots come without weapons (its gear comes from a mod that isn't installed) is noticed on the loading screen, and others are sent in its place.
 - **ORBIT:** ORBIT's bot brain stays out of the siege, because the hideout has none of the zones it plans routes across. Your other raids aren't affected.
 - **Fika:** the host runs the siege, and everyone sees the host's hideout, the cinematic and the wave counter. A Fika headless can host it too: start the defence from the alert, then pick the headless. It's your hideout they attack, with your racks, and the result is yours. Everyone has their own stash box.

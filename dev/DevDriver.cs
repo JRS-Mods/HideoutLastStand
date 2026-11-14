@@ -27,6 +27,9 @@ namespace HideoutSiege.Dev
         private void Awake()
         {
             if (int.TryParse(Environment.GetEnvironmentVariable("SIEGE_ROLL"), out int roll)) HideoutCopy.NextRoll = roll;
+            // SIEGE_WAVES: every wave of the siege, in order ("RESHALA,2 smugglers + 2 rogues,KILLA,bd").
+            string forcedWaves = Environment.GetEnvironmentVariable("SIEGE_WAVES");
+            if (!string.IsNullOrEmpty(forcedWaves)) DefenceRating.ForceWaves = forcedWaves.Split(',');
             // SIEGE_BOSSHEALTH: a boss's health as with more players (1.5 = two of you).
             if (float.TryParse(Environment.GetEnvironmentVariable("SIEGE_BOSSHEALTH"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bossHealth)) SiegeDirector.BossHealthForTest = bossHealth;
             Log = Logger;
@@ -1135,6 +1138,43 @@ namespace HideoutSiege.Dev
         private static readonly string AutoKill = Environment.GetEnvironmentVariable("SIEGE_AUTOKILL");
         private readonly System.Collections.Generic.Dictionary<BotOwner, float> seen = new System.Collections.Generic.Dictionary<BotOwner, float>();
 
+        // SIEGE_SAINLOG: the brain the game gave this bot, and what SAIN has made of him (its component, and every
+        // true-or-false and enemy it'll tell us about).
+        private static string SainState(BotOwner b)
+        {
+            var sb = new System.Text.StringBuilder("\n      brain=");
+            try { sb.Append(b.Brain?.BaseBrain?.ShortName()); } catch (Exception e) { sb.Append("? " + e.Message); }
+            try
+            {
+                Component sain = null;
+                foreach (var c in b.GetComponents<Component>())
+                    if (c != null && c.GetType().FullName.StartsWith("SAIN.") && c.GetType().Name == "BotComponent") sain = c;
+                if (sain == null)
+                {
+                    sb.Append(" SAIN=none; components:");
+                    foreach (var c in b.GetComponents<Component>()) if (c != null && !(c is Transform)) sb.Append(" " + c.GetType().Name);
+                    return sb.ToString();
+                }
+                sb.Append(" SAIN=yes");
+                const System.Reflection.BindingFlags all = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+                foreach (var prop in sain.GetType().GetProperties(all))
+                {
+                    if (prop.GetIndexParameters().Length > 0) continue;
+                    if (prop.PropertyType != typeof(bool) && !prop.PropertyType.IsEnum && prop.Name != "GoalEnemy" && prop.Name != "CurrentTarget") continue;
+                    object value;
+                    try { value = prop.GetValue(sain); } catch (Exception) { value = "!"; }
+                    sb.Append($" {prop.Name}={value ?? "null"}");
+                }
+                foreach (var field in sain.GetType().GetFields(all))
+                {
+                    if (field.FieldType != typeof(bool) && !field.FieldType.IsEnum) continue;
+                    sb.Append($" {field.Name}={field.GetValue(sain)}");
+                }
+            }
+            catch (Exception e) { sb.Append(" SAIN? " + e.Message); }
+            return sb.ToString();
+        }
+
         private void Telemetry()
         {
             var world = Singleton<GameWorld>.Instance;
@@ -1153,7 +1193,7 @@ namespace HideoutSiege.Dev
                     if (c.isActiveAndEnabled && c.gameObject.scene.IsValid() && c.isRootCanvas) Logger.LogInfo($"[siege] canvas {c.name} parent={c.transform.parent?.name} order={c.sortingOrder} mode={c.renderMode} root={c.transform.root.name}");
             }
             if (Time.realtimeSinceStartup < nextTelemetry || !Singleton<IBotGame>.Instantiated) return;
-            nextTelemetry = Time.realtimeSinceStartup + 8f;
+            nextTelemetry = Time.realtimeSinceStartup + (float.TryParse(Environment.GetEnvironmentVariable("SIEGE_TELEMETRY"), out float every) ? every : 8f);
             var bots = Singleton<IBotGame>.Instance.BotsController?.Bots?.BotOwners;
             var sb = new System.Text.StringBuilder();
             sb.Append($"[siege] t phase={SiegeState.Phase} wave={SiegeState.Wave}/{SiegeState.TotalWaves} left={SiegeState.Remaining} fps={1f / Time.smoothDeltaTime:F0} me={me.Position} hp={me.ActiveHealthController?.GetBodyPartHealth(EBodyPart.Common).Current:F0}");
@@ -1167,6 +1207,7 @@ namespace HideoutSiege.Dev
                     string layer = "", act = "";
                     try { layer = b.Brain?.ActiveLayerName(); act = b.Brain?.GetActiveNodeReason(); } catch (Exception) { layer = "?"; }
                     sb.Append($"\n   {b.Profile.Info.Settings.Role} d={Vector3.Distance(b.Position, me.Position):F1} pos={b.Position} {goal} layer={layer} act={act}");
+                    if (Environment.GetEnvironmentVariable("SIEGE_SAINLOG") != null) sb.Append(SainState(b));
                     if (!seen.ContainsKey(b)) seen[b] = Time.realtimeSinceStartup;
                     if (AutoKill != null && !SiegeDirector.Waiting.Contains(b) && Time.realtimeSinceStartup - seen[b] > float.Parse(AutoKill))
                         b.GetPlayer.ActiveHealthController.Kill(EDamageType.Bullet);

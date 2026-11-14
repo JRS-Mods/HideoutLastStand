@@ -2,6 +2,13 @@
 
 What changed in each version of Tushonka: Hideout Last Stand, newest first. How everything works now is in the [README](README.md).
 
+## 0.3.1 (14 November 2026)
+
+### Fixed
+
+- **Smugglers standing still.** With SAIN installed, a Smuggler would walk in, look at you and do nothing. SAIN takes the game's own fighting away from them and never gave them its own, so they had neither. The siege now has SAIN give them its fighting, as it does for Raiders. Once you've been in a siege, the same goes for the game's Bloodhounds in your other raids until you restart the game.
+- **Attackers walking back and forth at the front door.** An attacker who had a clear line to you but hadn't noticed you was left to himself, wandered back out of sight, was sent in again, and so on: Killa could spend a whole wave doing it, and bosses, their guards and scavs all did it at times. They keep coming now until they've actually noticed you.
+
 ## 0.3.0 (13 November 2026)
 
 ### Changed
